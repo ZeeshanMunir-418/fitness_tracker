@@ -1,12 +1,12 @@
 import { View, Text } from 'react-native'
 import React from 'react'
 
-const Modal = () => {
+const WorkoutScreen = () => {
   return (
     <View>
-      <Text>Modal</Text>
+      <Text>WorkoutScreen</Text>
     </View>
   )
 }
 
-export default Modal
+export default WorkoutScreen;
