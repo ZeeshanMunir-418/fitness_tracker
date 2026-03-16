@@ -1,6 +1,8 @@
 {
   "expo": {
     "name": "Apex Fitness Coach",
+      "@react-native-community/datetimepicker",
+      "@react-native-google-signin/google-signin"
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

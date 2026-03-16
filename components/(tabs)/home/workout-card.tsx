@@ -9,6 +9,7 @@ export interface Workout {
   image: number;
   duration: string;
   exercisesCount: number;
+  day?: string;
 }
 
 const WorkoutCard = ({
@@ -24,19 +25,19 @@ const WorkoutCard = ({
         <Image source={image} className="w-full h-full" resizeMode="contain" />
       </View>
       <View className="flex-1 ml-4 gap-2">
-        <Text className="text-2xl font-bold" numberOfLines={2}>
+        <Text className="text-2xl font-dmsans-bold" numberOfLines={2}>
           {title}
         </Text>
         <View className="flex-row items-center gap-3">
           <View className="flex-row items-center gap-1">
             <Clock size={13} color="#6b7280" />
-            <Text className="text-xs text-gray-500 font-medium">
+            <Text className="text-xs text-gray-500 font-medium font-dmsans">
               {duration}
             </Text>
           </View>
           <View className="flex-row items-center gap-1">
             <Dumbbell size={13} color="#6b7280" />
-            <Text className="text-xs text-gray-500 font-medium">
+            <Text className="text-xs text-gray-500 font-dmsans">
               {exercisesCount} EXERCISES
             </Text>
           </View>
@@ -44,7 +45,7 @@ const WorkoutCard = ({
         <Link href={`/workout/${id}`} asChild>
           <TouchableOpacity className="rounded-full bg-black overflow-hidden self-start mt-2">
             <View className="absolute top-0 left-[10%] right-[10%] h-1/2 bg-white/10 rounded-b-full" />
-            <Text className="text-white font-semibold text-base px-5 py-2">
+            <Text className="text-white font-dmsans text-base px-5 py-2">
               Start Now
             </Text>
           </TouchableOpacity>

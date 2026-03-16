@@ -3,10 +3,9 @@ import {
   MetricCard,
   type KeyMetrics,
 } from "@/components/(tabs)/home/metric-card";
-import WorkoutCard, {
-  type Workout,
-} from "@/components/(tabs)/home/workout-card";
+import WorkoutCard from "@/components/(tabs)/home/workout-card";
 import { useGreeting } from "@/lib/hooks/useGreeting";
+import { workouts } from "@/utils/workouts";
 import { Link } from "expo-router";
 import {
   ArrowRight,
@@ -26,36 +25,15 @@ const HomeScreen = () => {
     { icon: Droplets, value: "1.2L", label: "WATER" },
     { icon: Zap, value: "45", label: "MINS" },
   ];
-  const workouts: Workout[] = [
-    {
-      id: 1,
-      title: "Upper Body Strength Training",
-      image: require("@/assets/images/upper-body-strength.png"),
-      duration: "45 MIN",
-      exercisesCount: 6,
-    },
-    {
-      id: 2,
-      title: "Core & Abs Blast",
-      image: require("@/assets/images/core-abs.png"),
-      duration: "30 MIN",
-      exercisesCount: 8,
-    },
-    {
-      id: 3,
-      title: "Leg Day Power",
-      image: require("@/assets/images/leg.png"),
-      duration: "50 MIN",
-      exercisesCount: 7,
-    },
-  ];
+
+  const workout = workouts.find((w) => w.day?.startsWith(day)) || workouts[0];
 
   return (
     <SafeAreaView className="flex-1">
       <View className="px-4 flex-row items-center justify-between">
         <View>
-          <Text className="text-2xl font-semibold">{greeting}</Text>
-          <Text className="text-4xl font-bold">Muhammad Zain</Text>
+          <Text className="text-2xl font-semibold font-dmsans">{greeting}</Text>
+          <Text className="text-4xl font-dmsans-bold">Muhammad Zain</Text>
         </View>
         <TouchableOpacity className="border-2 border-black p-3 rounded-full">
           <Link href="/profile">
@@ -63,9 +41,12 @@ const HomeScreen = () => {
           </Link>
         </TouchableOpacity>
       </View>
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View className="px-4 mt-16 flex-row items-center justify-center ">
-          <CalorieRing goal={2500} intake={1850} size={255} />
+          <CalorieRing goal={2500} intake={1850} size={300} />
         </View>
         <View className="px-4 mt-16 flex-row items-center justify-center gap-4">
           {keyMetrics.map((metric, index) => (
@@ -81,8 +62,12 @@ const HomeScreen = () => {
 
         <View className="px-4 mb-4 flex-row items-center justify-between">
           <View>
-            <Text className="text-2xl font-semibold">Today&apos;s Workout</Text>
-            <Text className="text-sm text-gray-600 leading-none">{day}</Text>
+            <Text className="text-2xl font-dmsans-bold leading-none">
+              Today&apos;s Workout
+            </Text>
+            <Text className="text-sm text-gray-600 leading-none font-dmsans">
+              {day}
+            </Text>
           </View>
           <Link href="/workouts" asChild>
             <TouchableOpacity className="">
@@ -93,17 +78,13 @@ const HomeScreen = () => {
 
         {/* Workout Cards */}
         <View className="px-4">
-          {workouts.map((workout) => (
-            <View key={workout.id} className="mb-6">
-              <WorkoutCard
-                id={workout.id}
-                title={workout.title}
-                image={workout.image}
-                duration={workout.duration}
-                exercisesCount={workout.exercisesCount}
-              />
-            </View>
-          ))}
+          <WorkoutCard
+            id={workout.id}
+            title={workout.title}
+            image={workout.image}
+            duration={workout.duration}
+            exercisesCount={workout.exercisesCount}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

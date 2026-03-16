@@ -15,8 +15,8 @@ export const MetricCard: React.FC<KeyMetrics> = ({
   return (
     <View className="border-2 border-black bg-white p-4 flex-1 items-center justify-center rounded-2xl">
       <Icon size={36} color="#000" />
-      <Text className='text-xl font-bold mt-4 mb-1'>{value}</Text>
-      <Text className='text-gray-600 font-semibold leading-none uppercase'>{label}</Text>
+      <Text className='text-xl font-dmsans-bold mt-4 mb-1'>{value}</Text>
+      <Text className='text-gray-600 font-dmsans leading-none uppercase'>{label}</Text>
     </View>
   );
 };
