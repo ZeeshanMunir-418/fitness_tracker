@@ -1,6 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Text, View } from "react-native";
 
 interface FoodItem {
   foodName: string;
@@ -30,10 +31,10 @@ export const MealCard = ({
 }: MealCardProps) => {
   return (
     <View className="border-2 border-black rounded-[28px] overflow-hidden">
-      <TouchableOpacity
+      <Button
         onPress={() => setOpenDropDown(openDropDown ? null : mealKey)}
-        activeOpacity={0.8}
-        className="flex-row items-center justify-between px-4 py-3"
+        variant="ghost"
+        className="mt-0 flex-row items-center justify-between border-0 px-4 py-3"
       >
         <View className="flex-row items-center gap-3">
           <View className="rounded-full bg-black size-9 items-center justify-center">
@@ -58,7 +59,7 @@ export const MealCard = ({
             <ChevronDown size={24} color="#000" />
           )}
         </View>
-      </TouchableOpacity>
+      </Button>
 
       {openDropDown && (
         <View className="border-t-2 border-black px-4 py-3 gap-3">

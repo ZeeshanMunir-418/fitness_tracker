@@ -2,9 +2,7 @@
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "deno.enablePaths": [
-    "supabase/functions"
-  ],
+  "deno.enablePaths": ["supabase/functions"],
   "deno.lint": true,
   "deno.unstable": [
     "bare-node-builtins",
@@ -26,6 +24,9 @@
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
   },
+  "editor.cursorStyle": "line",
+  "editor.cursorWidth": 2,
+  "editor.cursorBlinking": "blink",
   "java.compile.nullAnalysis.mode": "automatic",
   "postman.settings.dotenv-detection-notification-visibility": false
 }

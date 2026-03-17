@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
+import axios, { AxiosError } from "axios";
 import { RootState } from "../index";
 
 export type Gender = "male" | "female" | "prefer_not_to_say" | null;
@@ -38,6 +39,7 @@ export type DietaryPreference =
 export type PreferredWorkoutTime = "morning" | "afternoon" | "evening" | null;
 
 interface OnboardingData {
+  avatarUri: string | null;
   fullName: string;
   age: number | null;
   gender: Gender;
@@ -73,6 +75,7 @@ const initialState: OnboardingState = {
   loading: false,
   error: null,
   data: {
+    avatarUri: null,
     fullName: "",
     age: null,
     gender: null,
@@ -101,66 +104,167 @@ export const saveOnboardingProfile = createAsyncThunk<
   void,
   void,
   { state: RootState; rejectValue: string }
->("onboarding/saveOnboardingProfile", async (_, { getState, rejectWithValue }) => {
-  const state = getState();
-  const { data } = state.onboarding;
+>(
+  "onboarding/saveOnboardingProfile",
+  async (_, { getState, rejectWithValue }) => {
+    console.log("[onboarding] saveOnboardingProfile: start");
+    const state = getState();
+    const { data } = state.onboarding;
 
-  let userId = state.auth.user?.id;
+    let userId = state.auth.user?.id;
+    let accessToken: string | null = null;
 
-  if (!userId) {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
+    if (!userId) {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
 
-    if (error || !user) {
-      return rejectWithValue(error?.message ?? "User not found.");
+      if (error || !user) {
+        console.error("[onboarding] getUser failed", error);
+        return rejectWithValue(error?.message ?? "User not found.");
+      }
+
+      userId = user.id;
     }
 
-    userId = user.id;
-  }
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
 
-  const payload = {
-    id: userId,
-    full_name: data.fullName,
-    age: data.age,
-    gender: data.gender,
-    height: data.height,
-    height_unit: data.heightUnit,
-    current_weight: data.currentWeight,
-    weight_unit: data.weightUnit,
-    primary_goal: data.primaryGoal,
-    activity_level: data.activityLevel,
-    preferred_workout_type: data.preferredWorkoutType,
-    workout_duration: data.workoutDuration,
-    workout_days_per_week: data.workoutDaysPerWeek,
-    dietary_preference: data.dietaryPreference,
-    daily_water_goal_liters: data.dailyWaterGoalLiters,
-    tracks_calories: data.tracksCalories,
-    target_weight: data.targetWeight,
-    target_date: data.targetDate,
-    weekly_weight_change_kg: data.weeklyWeightChangeKg,
-    workout_reminders: data.workoutReminders,
-    preferred_workout_time: data.preferredWorkoutTime,
-    meal_reminders: data.mealReminders,
-    onboarding_completed: true,
-    updated_at: new Date().toISOString(),
-  };
+    const expiresAt = sessionData?.session?.expires_at ?? 0;
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    const isExpiringSoon = expiresAt - nowInSeconds < 60;
 
-  const { error } = await supabase.from("profiles").upsert(payload, {
-    onConflict: "id",
-  });
+    if (isExpiringSoon) {
+      const { data: refreshed, error: refreshError } =
+        await supabase.auth.refreshSession();
+      if (refreshError || !refreshed.session) {
+        return rejectWithValue("Session expired. Please log in again.");
+      }
+      accessToken = refreshed.session.access_token;
+    } else {
+      accessToken = sessionData.session!.access_token;
+    }
 
-  if (error) {
-    return rejectWithValue(error.message);
-  }
-});
+    const payload: Record<string, unknown> = {
+      id: userId,
+      full_name: data.fullName,
+      age: data.age,
+      gender: data.gender,
+      height: data.height,
+      height_unit: data.heightUnit,
+      current_weight: data.currentWeight,
+      weight_unit: data.weightUnit,
+      primary_goal: data.primaryGoal,
+      activity_level: data.activityLevel,
+      preferred_workout_type: data.preferredWorkoutType,
+      workout_duration: data.workoutDuration,
+      workout_days_per_week: data.workoutDaysPerWeek,
+      dietary_preference: data.dietaryPreference,
+      daily_water_goal_liters: data.dailyWaterGoalLiters,
+      tracks_calories: data.tracksCalories,
+      target_weight: data.targetWeight,
+      target_date: data.targetDate,
+      weekly_weight_change_kg: data.weeklyWeightChangeKg,
+      workout_reminders: data.workoutReminders,
+      preferred_workout_time: data.preferredWorkoutTime,
+      meal_reminders: data.mealReminders,
+      onboarding_completed: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (data.avatarUri) {
+      try {
+        const fileExtMatch = data.avatarUri.split("?")[0]?.split(".").pop();
+        const fileExt = fileExtMatch ? fileExtMatch.toLowerCase() : "jpg";
+        const contentType = fileExt === "png" ? "image/png" : "image/jpeg";
+        const filePath = `${userId}/avatar.${fileExt}`;
+
+        const avatarResponse = await fetch(data.avatarUri);
+        const avatarArrayBuffer = await avatarResponse.arrayBuffer();
+        const avatarBytes = new Uint8Array(avatarArrayBuffer);
+
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(filePath, avatarBytes, {
+            contentType,
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error("[onboarding] avatar upload failed", uploadError);
+          return rejectWithValue(uploadError.message);
+        }
+
+        const bucketUrl = process.env.EXPO_PUBLIC_SUPABASE_BUCKET_URL;
+        if (bucketUrl) {
+          const publicUrl = `${bucketUrl}/avatars/${filePath}`;
+          payload.avatar_url = publicUrl;
+        }
+      } catch (error) {
+        console.error("[onboarding] avatar upload error", error);
+        const message =
+          error instanceof Error ? error.message : "Failed to upload avatar.";
+        return rejectWithValue(message);
+      }
+    }
+
+    const { error: dbError } = await supabase.from("profiles").upsert(payload, {
+      onConflict: "id",
+    });
+
+    if (dbError) {
+      console.error("[onboarding] profile upsert failed", dbError);
+      return rejectWithValue(dbError.message);
+    }
+
+    // Remove the entire axios import and the axios.post block, replace with:
+    const fnName = "personalized_workout_and_meal_plan";
+
+    try {
+      console.log("[onboarding] calling edge function", fnName);
+      const { data: fnData, error: fnError } = await supabase.functions.invoke(
+        fnName,
+        {
+          body: payload,
+        },
+      );
+
+      if (fnError) {
+        // Extract the real error message from the response body
+        let message = fnError.message ?? "Failed to generate plan.";
+        try {
+          const body = await (fnError as any).context?.json();
+          console.error("[onboarding] edge function error body", body);
+          message = body?.error ?? body?.message ?? message;
+        } catch {
+          console.error(
+            "[onboarding] edge function error (no body)",
+            fnError.message,
+          );
+        }
+        return rejectWithValue(message);
+      }
+
+      console.log("[onboarding] edge function response", fnData);
+    } catch (error) {
+      console.error("[onboarding] fn call failed", error);
+      const message =
+        error instanceof Error ? error.message : "Something went wrong";
+      return rejectWithValue(message);
+    }
+    console.log("[onboarding] saveOnboardingProfile: success");
+  },
+);
 
 const onboardingSlice = createSlice({
   name: "onboarding",
   initialState,
   reducers: {
-    updateOnboardingData: (state, action: PayloadAction<Partial<OnboardingData>>) => {
+    updateOnboardingData: (
+      state,
+      action: PayloadAction<Partial<OnboardingData>>,
+    ) => {
       state.data = { ...state.data, ...action.payload };
     },
     nextStep: (state) => {

@@ -1,10 +1,11 @@
 import OnboardingShell from "@/components/(onboarding)/onboarding-shell";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-    nextStep,
-    prevStep,
-    updateOnboardingData,
+  nextStep,
+  prevStep,
+  updateOnboardingData,
 } from "@/store/slices/onboardingSlice";
+import { cn } from "@/utils/cn";
 import { Href, useRouter } from "expo-router";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
@@ -87,14 +88,16 @@ const StepSevenScreen = () => {
                       }),
                     )
                   }
-                  className={`rounded-full px-4 py-3 ${
-                    active ? "bg-black" : "border-2 border-black bg-white"
-                  }`}
+                  className={cn("mt-0 p-4 rounded-full border-2 border-black", {
+                    "bg-black": active,
+                    "bg-white": !active,
+                  })}
                 >
                   <Text
-                    className={`font-dmsans-bold text-sm ${
-                      active ? "text-white" : "text-black"
-                    }`}
+                    className={cn("font-dmsans", {
+                      "text-white": active,
+                      "text-black": !active,
+                    })}
                   >
                     {option.label}
                   </Text>

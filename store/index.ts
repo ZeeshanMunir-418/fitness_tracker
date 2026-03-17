@@ -2,12 +2,14 @@ import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./slices/authSlice";
 import nutritionReducer from "./slices/nutritionSlice";
 import onboardingReducer from "./slices/onboardingSlice";
+import profileReducer from "./slices/profileSlice";
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     onboarding: onboardingReducer,
     nutrition: nutritionReducer,
+    profile: profileReducer,
   },
 });
 

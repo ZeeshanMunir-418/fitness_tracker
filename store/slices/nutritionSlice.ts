@@ -28,13 +28,13 @@ export const searchFood = createAsyncThunk(
   async (query: string, { rejectWithValue }) => {
     try {
       const res = await axios.get(
-        process.env.EXPO_PUBLIC_SUPABASE_FN_URL!,
+        process.env.EXPO_PUBLIC_SUPABASE_SEARCH_FN_URL!,
         {
           params: { q: query },
           headers: {
             Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-        }
+        },
       );
 
       // Debugging: Log the raw response data
@@ -43,7 +43,7 @@ export const searchFood = createAsyncThunk(
     } catch (err: any) {
       return rejectWithValue(err.message);
     }
-  }
+  },
 );
 
 const nutritionSlice = createSlice({
