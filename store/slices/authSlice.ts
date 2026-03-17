@@ -6,9 +6,7 @@ import Constants from "expo-constants";
 type GoogleSigninModule =
   typeof import("@react-native-google-signin/google-signin");
 
-const googleWebClientId =
-  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
-  process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
+const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 const isExpoGo = Constants.executionEnvironment === "storeClient";
 
@@ -20,9 +18,7 @@ const getGoogleSignin = async () => {
   }
 
   const { GoogleSignin } =
-    ((await import(
-      "@react-native-google-signin/google-signin"
-    )) as GoogleSigninModule);
+    (await import("@react-native-google-signin/google-signin")) as GoogleSigninModule;
   return GoogleSignin;
 };
 
@@ -36,10 +32,40 @@ const configureGoogleSignIn = async () => {
   return GoogleSignin;
 };
 
+const mapGoogleSignInError = (err: unknown) => {
+  const fallback = "Unexpected Google sign-in error.";
+
+  if (!err || typeof err !== "object") {
+    return fallback;
+  }
+
+  const maybeError = err as {
+    code?: string | number;
+    message?: string;
+  };
+
+  const message = maybeError.message ?? "";
+  const normalizedCode = String(maybeError.code ?? "").toUpperCase();
+  const normalizedMessage = message.toLowerCase();
+
+  const isDeveloperConfigError =
+    normalizedCode.includes("DEVELOPER_ERROR") ||
+    normalizedCode === "10" ||
+    normalizedMessage.includes("non-recoverable sign in failure") ||
+    normalizedMessage.includes("developer error");
+
+  if (isDeveloperConfigError) {
+    return "Google Sign-In config mismatch. Ensure Firebase Android app package and SHA-1/SHA-256 are registered, download a fresh android/app/google-services.json, and set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to the Web OAuth client from the same Firebase project.";
+  }
+
+  return maybeError.message ?? fallback;
+};
+
 interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  googleLoading: boolean;
   initialized: boolean;
   error: string | null;
 }
@@ -48,6 +74,7 @@ const initialState: AuthState = {
   user: null,
   session: null,
   loading: false,
+  googleLoading: false,
   initialized: false,
   error: null,
 };
@@ -142,7 +169,7 @@ export const signInWithGoogle = createAsyncThunk<void, void>(
 
       if (error) return rejectWithValue(error.message);
     } catch (err: any) {
-      return rejectWithValue(err.message ?? "Unexpected Google sign-in error.");
+      return rejectWithValue(mapGoogleSignInError(err));
     }
   },
 );
@@ -231,15 +258,15 @@ const authSlice = createSlice({
     });
     // signInWithGoogle
     builder.addCase(signInWithGoogle.pending, (state) => {
-      state.loading = true;
+      state.googleLoading = true;
       state.error = null;
     });
     builder.addCase(signInWithGoogle.fulfilled, (state) => {
-      state.loading = false;
+      state.googleLoading = false;
       // No user or session is set here; handled after OAuth redirect.
     });
     builder.addCase(signInWithGoogle.rejected, (state, action) => {
-      state.loading = false;
+      state.googleLoading = false;
       state.error = action.payload as string;
     });
   },

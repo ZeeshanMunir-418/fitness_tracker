@@ -1,6 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react-native";
 import React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface OnboardingShellProps {
@@ -32,13 +33,15 @@ const OnboardingShell = ({
   return (
     <SafeAreaView className="flex-1 bg-white px-6">
       <View className="mt-2 flex-row items-center justify-between">
-        <Pressable
+        <Button
           onPress={onBack}
           disabled={!onBack}
-          className="h-10 w-10 items-center justify-center rounded-full border-2 border-black"
+          variant="outline"
+          size="icon"
+          className="mt-0 h-10 w-10 items-center justify-center"
         >
           <ChevronLeft size={20} color="#000" strokeWidth={2.5} />
-        </Pressable>
+        </Button>
         <Text className="font-dmsans text-sm text-neutral-500">
           {step} / {totalSteps}
         </Text>
@@ -66,18 +69,15 @@ const OnboardingShell = ({
       </ScrollView>
 
       <View className="pb-5 pt-3">
-        <Pressable
+        <Button
           onPress={onNext}
           disabled={nextDisabled}
-          className={`relative items-center overflow-hidden rounded-full px-6 py-5 ${
-            nextDisabled ? "bg-black/30" : "bg-black"
-          }`}
+          className={`mt-0 w-full px-6 py-5 ${nextDisabled ? "bg-black/30" : "bg-black"}`}
         >
-          <View className="absolute left-3 right-3 top-2 h-1/2 rounded-full bg-white/10" />
           <Text className="font-dmsans-bold text-[15px] tracking-[1.8px] text-white">
             {nextLabel}
           </Text>
-        </Pressable>
+        </Button>
       </View>
     </SafeAreaView>
   );

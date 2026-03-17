@@ -4,13 +4,34 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { getSession, setSession } from "@/store/slices/authSlice";
 import { DMSans_400Regular, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { useFonts } from "expo-font";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { Provider } from "react-redux";
 import "../globals.css";
+
+const onboardingCacheKey = (userId: string) =>
+  `apex_onboarding_completed_${userId}`;
+
+const getCachedOnboardingCompleted = (userId: string) => {
+  try {
+    const raw = globalThis.localStorage?.getItem(onboardingCacheKey(userId));
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedOnboardingCompleted = (userId: string, value: boolean) => {
+  try {
+    globalThis.localStorage?.setItem(onboardingCacheKey(userId), String(value));
+  } catch {
+    // Ignore cache write failures.
+  }
+};
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -19,6 +40,7 @@ export const unstable_settings = {
 function AppNavigator() {
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const segments = useSegments();
   const { session, initialized } = useAppSelector((s) => s.auth);
 
   useEffect(() => {
@@ -47,6 +69,29 @@ function AppNavigator() {
     let isMounted = true;
 
     const checkOnboarding = async () => {
+      const rootSegment = segments[0];
+      const inAuthGroup = rootSegment === "(auth)";
+      const inOnboardingGroup = rootSegment === "(onboarding)";
+      const inTabsGroup = rootSegment === "(tabs)";
+      const inLandingRoute = segments.length === 0 || rootSegment === "index";
+
+      // Use cached onboarding state first to avoid blocking on network.
+      const cachedOnboardingCompleted = getCachedOnboardingCompleted(
+        session.user.id,
+      );
+
+      if (cachedOnboardingCompleted === false && !inOnboardingGroup) {
+        router.replace("/(onboarding)/step-1");
+      }
+
+      if (
+        cachedOnboardingCompleted === true &&
+        !inTabsGroup &&
+        (inAuthGroup || inOnboardingGroup || inLandingRoute)
+      ) {
+        router.replace("/(tabs)");
+      }
+
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("onboarding_completed")
@@ -56,11 +101,22 @@ function AppNavigator() {
       if (!isMounted) return;
 
       if (error || !profile?.onboarding_completed) {
-        router.replace("/(onboarding)/step-1");
+        setCachedOnboardingCompleted(session.user.id, false);
+        if (!inOnboardingGroup) {
+          router.replace("/(onboarding)/step-1");
+        }
         return;
       }
 
-      router.replace("/(tabs)");
+      setCachedOnboardingCompleted(session.user.id, true);
+
+      // Only force tabs from gate routes. Do not override normal tab/stack navigation.
+      if (
+        !inTabsGroup &&
+        (inAuthGroup || inOnboardingGroup || inLandingRoute)
+      ) {
+        router.replace("/(tabs)");
+      }
     };
 
     checkOnboarding();
@@ -68,30 +124,17 @@ function AppNavigator() {
     return () => {
       isMounted = false;
     };
-  }, [initialized, session, router]);
-
-  if (!initialized) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "#fff",
-        }}
-      >
-        <ActivityIndicator color="#000" size="large" />
-      </View>
-    );
-  }
+  }, [initialized, session, router, segments]);
 
   return (
     <Stack>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+      <Stack.Screen name="(notifications)" options={{ headerShown: false }} />
+      <Stack.Screen name="(profile)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="workout/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="workout" options={{ headerShown: false }} />
       <Stack.Screen
         name="modal"
         options={{ presentation: "modal", title: "Modal" }}
@@ -111,7 +154,7 @@ export default function RootLayout() {
   return (
     <Provider store={store}>
       <AppNavigator />
-      <StatusBar style="auto" />
+      <StatusBar style="dark" />
     </Provider>
   );
 }

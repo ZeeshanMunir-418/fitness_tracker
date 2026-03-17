@@ -1,20 +1,14 @@
+import { Button } from "@/components/ui/button";
+import Input from "@/components/ui/input";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-  clearResults,
-  FoodItem,
-  searchFood,
+    clearResults,
+    FoodItem,
+    searchFood,
 } from "@/store/slices/nutritionSlice";
 import { X } from "lucide-react-native";
 import React, { useState } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, Modal, ScrollView, Text, View } from "react-native";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snacks";
 
@@ -77,11 +71,13 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
     >
       <View className="flex-1 justify-end">
         {/* Backdrop */}
-        <TouchableOpacity
-          className="absolute inset-0 bg-black/40"
-          activeOpacity={1}
+        <Button
+          className="absolute inset-0 mt-0 border-0 bg-black/40 p-0"
+          variant="ghost"
           onPress={handleClose}
-        />
+        >
+          <View />
+        </Button>
 
         {/* Sheet */}
         <View className="bg-white rounded-t-3xl border-t-2 border-x-2 border-black px-4 pt-5 pb-10 max-h-[92%]">
@@ -93,12 +89,14 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
             <Text className="text-2xl font-dmsans-bold uppercase tracking-tight">
               Add Food
             </Text>
-            <TouchableOpacity
+            <Button
               onPress={handleClose}
-              className="border-2 border-black rounded-full p-1"
+              className="mt-0 rounded-full p-1"
+              variant="outline"
+              size="icon"
             >
               <X size={20} color="#000" />
-            </TouchableOpacity>
+            </Button>
           </View>
 
           <ScrollView
@@ -111,10 +109,11 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
             </Text>
             <View className="flex-row flex-wrap gap-2 mb-5">
               {MEAL_KEYS.map((key) => (
-                <TouchableOpacity
+                <Button
                   key={key}
                   onPress={() => setSelectedMeal(key)}
-                  className={`px-4 py-2 rounded-full border-2 border-black ${
+                  variant={selectedMeal === key ? "primary" : "outline"}
+                  className={`mt-0 rounded-full px-4 py-2 ${
                     selectedMeal === key ? "bg-black" : "bg-white"
                   }`}
                 >
@@ -125,7 +124,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                   >
                     {key}
                   </Text>
-                </TouchableOpacity>
+                </Button>
               ))}
             </View>
 
@@ -136,25 +135,23 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
               Search Food
             </Text>
             <View className="flex-row gap-2 mb-4">
-              <TextInput
+              <Input
+                containerClassName="flex-1"
                 value={query}
                 onChangeText={setQuery}
                 onSubmitEditing={handleSearch}
                 returnKeyType="search"
                 placeholder="e.g. chicken biryani"
-                placeholderTextColor="#737373"
-                className="flex-1 border-2 border-black rounded-full px-5 py-3 font-dmsans text-black text-base"
+                className="py-3"
               />
-              <TouchableOpacity
+              <Button
                 onPress={handleSearch}
-                activeOpacity={0.85}
-                className="bg-black rounded-full px-5 py-3 justify-center overflow-hidden"
+                className="mt-0 justify-center px-5 py-3"
               >
-                <View className="absolute inset-x-0 top-0 h-1/2 bg-white/10 rounded-t-full" />
                 <Text className="font-dmsans-bold text-white text-sm uppercase tracking-tight">
                   Search
                 </Text>
-              </TouchableOpacity>
+              </Button>
             </View>
 
             {/* Error */}
@@ -182,12 +179,12 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                     (i) => i.foodId === item.foodId,
                   );
                   return (
-                    <TouchableOpacity
+                    <Button
                       key={item.foodId}
                       onPress={() => handleAddItem(item)}
-                      activeOpacity={0.8}
                       disabled={alreadyAdded}
-                      className={`border-2 border-black rounded-2xl px-4 py-3 ${
+                      variant="outline"
+                      className={`mt-0 rounded-2xl px-4 py-3 ${
                         alreadyAdded ? "opacity-40" : "bg-white"
                       }`}
                     >
@@ -198,7 +195,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                         {item.calories} kcal · P {item.proteinGrams}g · C{" "}
                         {item.carbsGrams}g · F {item.fatGrams}g
                       </Text>
-                    </TouchableOpacity>
+                    </Button>
                   );
                 })}
               </View>
@@ -230,12 +227,14 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                         {item.fatGrams}g
                       </Text>
                     </View>
-                    <TouchableOpacity
+                    <Button
                       onPress={() => handleRemoveItem(item.foodId)}
-                      className="ml-3 border-2 border-black rounded-full p-1"
+                      variant="outline"
+                      size="icon"
+                      className="ml-3 mt-0 rounded-full p-1"
                     >
                       <X size={14} color="#000" />
-                    </TouchableOpacity>
+                    </Button>
                   </View>
                 ))}
               </View>
@@ -243,27 +242,26 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
 
             {/* Footer buttons */}
             <View className="flex-row gap-3">
-              <TouchableOpacity
+              <Button
                 onPress={handleClose}
-                className="flex-1 border-2 border-black rounded-full py-3 items-center"
+                variant="outline"
+                className="mt-0 flex-1 items-center py-3"
               >
                 <Text className="font-dmsans-bold text-black text-sm uppercase tracking-tight">
                   Cancel
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </Button>
+              <Button
                 onPress={handleSave}
                 disabled={selectedItems.length === 0}
-                activeOpacity={0.85}
-                className={`flex-1 bg-black rounded-full py-3 items-center overflow-hidden ${
+                className={`mt-0 flex-1 items-center rounded-full py-3 ${
                   selectedItems.length === 0 ? "opacity-40" : ""
                 }`}
               >
-                <View className="absolute inset-x-0 top-0 h-1/2 bg-white/10 rounded-t-full" />
                 <Text className="font-dmsans-bold text-white text-sm uppercase tracking-tight">
                   Save to {selectedMeal}
                 </Text>
-              </TouchableOpacity>
+              </Button>
             </View>
           </ScrollView>
         </View>

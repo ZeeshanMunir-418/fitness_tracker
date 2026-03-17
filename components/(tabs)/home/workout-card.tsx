@@ -1,7 +1,8 @@
+import { Button } from "@/components/ui/button";
 import { Link } from "expo-router";
 import { Clock, Dumbbell } from "lucide-react-native";
 import React from "react";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { Image, Text, View } from "react-native";
 
 export interface Workout {
   id: number;
@@ -43,12 +44,9 @@ const WorkoutCard = ({
           </View>
         </View>
         <Link href={`/workout/${id}`} asChild>
-          <TouchableOpacity className="rounded-full bg-black overflow-hidden self-start mt-2">
-            <View className="absolute top-0 left-[10%] right-[10%] h-1/2 bg-white/10 rounded-b-full" />
-            <Text className="text-white font-dmsans text-base px-5 py-2">
-              Start Now
-            </Text>
-          </TouchableOpacity>
+          <Button>
+            <Text className="text-white font-dmsans text-base">Start Now</Text>
+          </Button>
         </Link>
       </View>
     </View>
