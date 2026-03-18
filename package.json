@@ -5,6 +5,7 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
+    "eas-build-pre-install": "node ./scripts/eas-pre-install.js",
     "prebuild-android": "expo prebuild -p android",
     "prebuild-ios": "expo prebuild -p ios",
     "android": "expo run:android",
