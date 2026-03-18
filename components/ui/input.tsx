@@ -1,3 +1,4 @@
+import { useTheme } from "@/lib/theme/ThemeContext";
 import React from "react";
 import { TextInput, TextInputProps, View } from "react-native";
 
@@ -17,17 +18,24 @@ const Input = ({
   error,
   ...props
 }: InputProps) => {
+  const { colors } = useTheme();
+
   return (
     <View
       className={`flex-row items-center rounded-full border-2 px-5 ${
         error ? "border-black/50" : "border-black"
       } ${containerClassName}`}
+      style={{
+        backgroundColor: colors.inputBg,
+        borderColor: error ? colors.borderMuted : colors.border,
+      }}
     >
       {leftIcon}
 
       <TextInput
         className={`flex-1 py-4 font-dmsans text-base text-black ${className}`}
-        placeholderTextColor="#a3a3a3"
+        style={{ color: colors.text }}
+        placeholderTextColor={colors.textMuted}
         {...props}
       />
 

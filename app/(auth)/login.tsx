@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Input from "@/components/ui/input";
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearError, signIn, signInWithGoogle } from "@/store/slices/authSlice";
 import { AntDesign } from "@expo/vector-icons";
@@ -31,6 +32,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 const LoginScreen = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { colors } = useTheme();
   const {
     loading,
     googleLoading,
@@ -66,34 +68,49 @@ const LoginScreen = () => {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1"
+      style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ flexGrow: 1 }}
       >
-        <SafeAreaView className="flex-1 bg-white px-6">
+        <SafeAreaView
+          style={{
+            flex: 1,
+            backgroundColor: colors.background,
+            paddingHorizontal: 24,
+          }}
+        >
           {/* Header */}
-          <View className="mt-10 items-center">
+          <View style={{ marginTop: 40, alignItems: "center" }}>
             <Image
               source={require("@/assets/images/ghost-mascot.png")}
-              className="h-16 w-16"
+              style={{ height: 64, width: 64 }}
               resizeMode="contain"
             />
-            <Text className="mt-4 font-dmsans-bold text-4xl tracking-tight text-black">
+            <Text
+              style={{ color: colors.text, marginTop: 16 }}
+              className="font-dmsans-bold text-4xl tracking-tight"
+            >
               WELCOME BACK
             </Text>
-            <Text className="mt-2 text-center font-dmsans text-base text-neutral-500">
+            <Text
+              style={{ color: colors.textMuted, marginTop: 8 }}
+              className="font-dmsans text-base text-center"
+            >
               Log in to continue your fitness journey
             </Text>
           </View>
 
           {/* Form */}
-          <View className="mt-10 gap-5">
+          <View style={{ marginTop: 40, gap: 20 }}>
             {/* Email */}
-            <View className="gap-2">
-              <Text className="font-dmsans text-xs uppercase tracking-widest text-neutral-500">
+            <View style={{ gap: 8 }}>
+              <Text
+                style={{ color: colors.textMuted }}
+                className="font-dmsans text-xs uppercase tracking-widest"
+              >
                 Email Address
               </Text>
               <Controller
@@ -112,7 +129,7 @@ const LoginScreen = () => {
                     leftIcon={
                       <Mail
                         size={20}
-                        color="#737373"
+                        color={colors.textMuted}
                         style={{ marginRight: 12 }}
                       />
                     }
@@ -120,15 +137,21 @@ const LoginScreen = () => {
                 )}
               />
               {errors.email && (
-                <Text className="pl-4 font-dmsans text-xs text-black/60">
+                <Text
+                  style={{ color: colors.textMuted }}
+                  className="font-dmsans text-xs pl-4"
+                >
                   {errors.email.message}
                 </Text>
               )}
             </View>
 
             {/* Password */}
-            <View className="gap-2">
-              <Text className="font-dmsans text-xs uppercase tracking-widest text-neutral-500">
+            <View style={{ gap: 8 }}>
+              <Text
+                style={{ color: colors.textMuted }}
+                className="font-dmsans text-xs uppercase tracking-widest"
+              >
                 Password
               </Text>
               <Controller
@@ -147,7 +170,7 @@ const LoginScreen = () => {
                     leftIcon={
                       <Lock
                         size={20}
-                        color="#737373"
+                        color={colors.textMuted}
                         style={{ marginRight: 12 }}
                       />
                     }
@@ -159,9 +182,17 @@ const LoginScreen = () => {
                         onPress={() => setShowPassword((p) => !p)}
                       >
                         {showPassword ? (
-                          <EyeOff size={20} color="#737373" strokeWidth={2} />
+                          <EyeOff
+                            size={20}
+                            color={colors.textMuted}
+                            strokeWidth={2}
+                          />
                         ) : (
-                          <Eye size={20} color="#737373" strokeWidth={2} />
+                          <Eye
+                            size={20}
+                            color={colors.textMuted}
+                            strokeWidth={2}
+                          />
                         )}
                       </Button>
                     }
@@ -169,7 +200,10 @@ const LoginScreen = () => {
                 )}
               />
               {errors.password && (
-                <Text className="pl-4 font-dmsans text-xs text-black/60">
+                <Text
+                  style={{ color: colors.textMuted }}
+                  className="font-dmsans text-xs pl-4"
+                >
                   {errors.password.message}
                 </Text>
               )}
@@ -180,15 +214,30 @@ const LoginScreen = () => {
               variant="ghost"
               className="mt-0 self-end border-0 px-0 py-0"
             >
-              <Text className="font-dmsans-bold text-sm text-black">
+              <Text
+                style={{ color: colors.text }}
+                className="font-dmsans-bold text-sm"
+              >
                 Forgot password?
               </Text>
             </Button>
 
             {/* Auth Error */}
             {authError && (
-              <View className="rounded-2xl border-2 border-black/10 bg-black/5 px-4 py-3">
-                <Text className="font-dmsans text-sm text-black">
+              <View
+                style={{
+                  borderRadius: 16,
+                  borderWidth: 2,
+                  borderColor: colors.cardBorder,
+                  backgroundColor: colors.card,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                }}
+              >
+                <Text
+                  style={{ color: colors.text }}
+                  className="font-dmsans text-sm"
+                >
                   {authError}
                 </Text>
               </View>
@@ -196,61 +245,112 @@ const LoginScreen = () => {
           </View>
 
           {/* CTA */}
-          <View className="mt-8 gap-4">
+          <View style={{ marginTop: 32, gap: 16 }}>
             {/* Login Button */}
-            <Button
-              className="w-full"
+            <Pressable
               onPress={handleSubmit(onSubmit)}
               disabled={loading || googleLoading}
+              style={{
+                backgroundColor:
+                  loading || googleLoading ? colors.textFaint : colors.text,
+                borderRadius: 999,
+                paddingVertical: 18,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
-              <View className="items-center justify-center py-2">
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text className="font-dmsans-bold text-[16px] tracking-[2px] text-white">
-                    LOG IN
-                  </Text>
-                )}
-              </View>
-            </Button>
+              {loading ? (
+                <ActivityIndicator color={colors.background} />
+              ) : (
+                <Text
+                  style={{ color: colors.background }}
+                  className="font-dmsans-bold text-base tracking-widest"
+                >
+                  LOG IN
+                </Text>
+              )}
+            </Pressable>
 
             {/* Divider */}
-            <View className="flex-row items-center gap-3">
-              <View className="h-px flex-1 bg-neutral-200" />
-              <Text className="font-dmsans text-xs tracking-widest text-neutral-400">
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  height: 1,
+                  backgroundColor: colors.borderMuted,
+                }}
+              />
+              <Text
+                style={{ color: colors.textFaint }}
+                className="font-dmsans text-xs tracking-widest"
+              >
                 OR
               </Text>
-              <View className="h-px flex-1 bg-neutral-200" />
+              <View
+                style={{
+                  flex: 1,
+                  height: 1,
+                  backgroundColor: colors.borderMuted,
+                }}
+              />
             </View>
 
             {/* Google Button */}
-            <Button
-              className="w-full"
-              variant="outline"
+            <Pressable
               onPress={handleGoogleSignIn}
               disabled={loading || googleLoading}
+              style={{
+                borderRadius: 999,
+                borderWidth: 2,
+                borderColor: colors.border,
+                backgroundColor: "transparent",
+                paddingVertical: 16,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
             >
-              <View className="flex-row items-center justify-center py-2 gap-2">
-                {googleLoading ? (
-                  <ActivityIndicator color="#000" />
-                ) : (
-                  <AntDesign name="google" size={20} color="#000" />
-                )}
-                <Text className="font-dmsans-bold text-[15px] tracking-[1px] text-black">
-                  Continue with Google
-                </Text>
-              </View>
-            </Button>
+              {googleLoading ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <AntDesign name="google" size={20} color={colors.text} />
+              )}
+              <Text
+                style={{ color: colors.text }}
+                className="font-dmsans-bold text-base"
+              >
+                Continue with Google
+              </Text>
+            </Pressable>
           </View>
 
           {/* Footer */}
-          <View className="mb-6 mt-auto flex-row items-center justify-center gap-1 pt-8">
-            <Text className="font-dmsans text-sm text-neutral-500">
-              Don&apos;t have an account?
+          <View
+            style={{
+              marginTop: "auto",
+              paddingTop: 32,
+              paddingBottom: 24,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+            }}
+          >
+            <Text
+              style={{ color: colors.textMuted }}
+              className="font-dmsans text-sm"
+            >
+              Don't have an account?
             </Text>
             <Link href="/(auth)/register" asChild>
-              <Pressable className="mt-0 border-0 px-0 py-0">
-                <Text className="font-dmsans-bold text-sm text-black">
+              <Pressable>
+                <Text
+                  style={{ color: colors.text }}
+                  className="font-dmsans-bold text-sm"
+                >
                   Sign Up
                 </Text>
               </Pressable>

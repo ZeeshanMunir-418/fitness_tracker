@@ -1,3 +1,4 @@
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { cn } from "@/utils/cn";
 import React, { createContext, useContext, useState } from "react";
 import { Image, ImageProps, View, ViewProps } from "react-native";
@@ -13,13 +14,25 @@ interface AvatarProps extends ViewProps {
   className?: string;
 }
 
-export function Avatar({ children, className, ...props }: AvatarProps) {
+export function Avatar({ children, className, style, ...props }: AvatarProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const { colors } = useTheme();
 
   return (
     <AvatarContext.Provider value={{ imageLoaded, setImageLoaded }}>
       <View
-        className={`relative flex h-12 w-12 shrink-0 overflow-hidden rounded-full ${className}`}
+        className={cn(
+          "relative flex h-12 w-12 shrink-0 overflow-hidden rounded-full",
+          className,
+        )}
+        style={[
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+            borderWidth: 2,
+          },
+          style,
+        ]}
         {...props}
       >
         {children}
@@ -39,7 +52,6 @@ export function AvatarImage({ className, ...props }: AvatarImageProps) {
 
   const { setImageLoaded } = context;
 
-  // Don't render the Image at all if there is no URI — let the fallback show.
   const uri = (props.source as { uri?: string })?.uri;
   if (!uri) return null;
 
@@ -61,17 +73,19 @@ interface AvatarFallbackProps extends ViewProps {
 export function AvatarFallback({
   className,
   children,
+  style,
   ...props
 }: AvatarFallbackProps) {
   const context = useContext(AvatarContext);
+  const { colors } = useTheme();
 
   if (!context) return null;
-
   if (context.imageLoaded) return null;
 
   return (
     <View
       className={cn("absolute inset-0 items-center justify-center", className)}
+      style={[{ backgroundColor: colors.card }, style]}
       {...props}
     >
       {children}

@@ -2,13 +2,13 @@ import OnboardingShell from "@/components/(onboarding)/onboarding-shell";
 import { Button } from "@/components/ui/button";
 import { CustomDatePicker } from "@/components/ui/date-picker";
 import Input from "@/components/ui/input";
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   nextStep,
   prevStep,
   updateOnboardingData,
 } from "@/store/slices/onboardingSlice";
-import { cn } from "@/utils/cn";
 import { Href, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
@@ -31,8 +31,10 @@ const weeklyOptions = [
 const StepSixScreen = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { colors } = useTheme();
   const { targetWeight, targetDate, weeklyWeightChangeKg, weightUnit } =
     useAppSelector((s) => s.onboarding.data);
+
   const [showPicker, setShowPicker] = useState(false);
   const [targetWeightText, setTargetWeightText] = useState(
     targetWeight ? String(targetWeight) : "",
@@ -64,12 +66,16 @@ const StepSixScreen = () => {
       nextDisabled={nextDisabled}
     >
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View className="gap-6">
-          <View className="gap-2">
-            <Text className="font-dmsans text-xs uppercase tracking-widest text-neutral-500">
+        <View style={{ gap: 24 }}>
+          {/* ── Target Weight ─────────────────────────────────────────── */}
+          <View style={{ gap: 8 }}>
+            <Text
+              style={{ color: colors.textMuted }}
+              className="font-dmsans text-xs uppercase tracking-widest"
+            >
               Target Weight ({weightUnit.toUpperCase()})
             </Text>
             <Input
@@ -90,8 +96,12 @@ const StepSixScreen = () => {
             />
           </View>
 
-          <View className="gap-2">
-            <Text className="font-dmsans text-xs uppercase tracking-widest text-neutral-500">
+          {/* ── Target Date ───────────────────────────────────────────── */}
+          <View style={{ gap: 8 }}>
+            <Text
+              style={{ color: colors.textMuted }}
+              className="font-dmsans text-xs uppercase tracking-widest"
+            >
               Target Date
             </Text>
             <Button
@@ -99,13 +109,15 @@ const StepSixScreen = () => {
               variant="outline"
               className="mt-0 w-full"
             >
-              <Text className="font-dmsans text-base text-black">
+              <Text
+                style={{ color: colors.text }}
+                className="font-dmsans text-base"
+              >
                 {targetDate
                   ? new Date(targetDate).toDateString()
                   : "Select target date"}
               </Text>
             </Button>
-
             <CustomDatePicker
               value={dateValue}
               minimumDate={new Date()}
@@ -121,8 +133,12 @@ const StepSixScreen = () => {
             />
           </View>
 
-          <View className="gap-2">
-            <Text className="font-dmsans text-xs uppercase tracking-widest text-neutral-500">
+          {/* ── Weekly Weight Change ──────────────────────────────────── */}
+          <View style={{ gap: 8 }}>
+            <Text
+              style={{ color: colors.textMuted }}
+              className="font-dmsans text-xs uppercase tracking-widest"
+            >
               Weekly Weight Change
             </Text>
             <View className="flex-row flex-wrap gap-2">
@@ -138,17 +154,21 @@ const StepSixScreen = () => {
                         }),
                       )
                     }
-                    className={cn(
-                      "mt-0 px-4 py-3 rounded-full border-2 border-black bg-white",
-                      {
-                        "bg-black": active,
-                      },
-                    )}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderRadius: 999,
+                      borderWidth: 2,
+                      borderColor: active ? colors.border : colors.borderMuted,
+                      backgroundColor: active ? colors.text : "transparent",
+                    }}
                   >
                     <Text
-                      className={`font-dmsans-bold text-sm ${
-                        active ? "text-white" : "text-black"
-                      }`}
+                      style={{
+                        color: active ? colors.background : colors.text,
+                        fontSize: 13,
+                      }}
+                      className="font-dmsans-bold"
                     >
                       {option.label}
                     </Text>

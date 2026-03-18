@@ -1,3 +1,4 @@
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { Link, Stack } from "expo-router";
 import { ArrowRight } from "lucide-react-native";
 import React from "react";
@@ -7,21 +8,36 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const dots = Array.from({ length: 96 }, (_, i) => i);
 
 const LandingScreen = () => {
+  const { colors, isDark } = useTheme();
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SafeAreaView className="flex-1 bg-[#F5F5F5]">
+      <SafeAreaView
+        className="flex-1 bg-[#F5F5F5]"
+        style={{ backgroundColor: isDark ? colors.background : "#F5F5F5" }}
+      >
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ flexGrow: 1 }}
           className="flex-1"
         >
-          <View className="flex-1 overflow-hidden backdrop:bg-[#F5F5F5]">
+          <View
+            className="flex-1 overflow-hidden backdrop:bg-[#F5F5F5]"
+            style={{ backgroundColor: isDark ? colors.background : "#F5F5F5" }}
+          >
             <View className="pointer-events-none absolute inset-0 flex-row flex-wrap px-4 pt-4">
               {dots.map((dot) => (
                 <View key={dot} className="w-1/6 items-center py-3">
-                  <View className="h-1 w-1 rounded-full bg-black/10" />
+                  <View
+                    className="h-1 w-1 rounded-full bg-black/10"
+                    style={{
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.18)"
+                        : "rgba(0,0,0,0.1)",
+                    }}
+                  />
                 </View>
               ))}
             </View>
@@ -36,26 +52,44 @@ const LandingScreen = () => {
                       resizeMode="contain"
                     />
                   </View>
-                  <Text className="font-dmsans-bold text-3xl text-black">
+                  <Text
+                    className="font-dmsans-bold text-3xl text-black"
+                    style={{ color: colors.text }}
+                  >
                     APEX
                   </Text>
                 </View>
               </View>
 
               <View className="mt-10">
-                <Text className="font-dmsans-bold text-[56px] leading-[52px] tracking-tight text-black">
+                <Text
+                  className="font-dmsans-bold text-[56px] leading-[52px] tracking-tight text-black"
+                  style={{ color: colors.text }}
+                >
                   TRAIN
                 </Text>
-                <Text className="font-dmsans-bold text-[56px] leading-[52px] tracking-tight text-black">
+                <Text
+                  className="font-dmsans-bold text-[56px] leading-[52px] tracking-tight text-black"
+                  style={{ color: colors.text }}
+                >
                   LIKE A
                 </Text>
-                <Text className="font-dmsans-bold text-[56px] leading-[52px] tracking-tight text-black">
+                <Text
+                  className="font-dmsans-bold text-[56px] leading-[52px] tracking-tight text-black"
+                  style={{ color: colors.text }}
+                >
                   GHOST.
                 </Text>
 
                 <View className="mt-6 max-w-[320px] flex-row">
-                  <View className="mr-4 mt-1 h-14 w-1 bg-black" />
-                  <Text className="flex-1 font-dmsans-bold text-[18px] leading-7 text-neutral-500">
+                  <View
+                    className="mr-4 mt-1 h-14 w-1 bg-black"
+                    style={{ backgroundColor: colors.border }}
+                  />
+                  <Text
+                    className="flex-1 font-dmsans-bold text-[18px] leading-7 text-neutral-500"
+                    style={{ color: colors.textMuted }}
+                  >
                     Track workouts, nutrition, and progress — all in one place.
                   </Text>
                 </View>
@@ -78,7 +112,13 @@ const LandingScreen = () => {
               </View>
             </View>
 
-            <View className="mt-auto border-t-2 border-black bg-white px-6 pb-8 pt-4">
+            <View
+              className="mt-auto border-t-2 border-black bg-white px-6 pb-8 pt-4"
+              style={{
+                borderColor: colors.border,
+                backgroundColor: colors.inputBg,
+              }}
+            >
               <Link href="/(auth)/register" asChild>
                 <Pressable className="relative items-center rounded-full bg-black px-6 py-5">
                   <View className="absolute left-3 right-3 top-2 h-1/2 rounded-full bg-white/10" />
@@ -93,13 +133,19 @@ const LandingScreen = () => {
 
               <Link href="/(auth)/login" asChild>
                 <Pressable className="mt-4 items-center rounded-full border-2 border-black bg-white px-6 py-5">
-                  <Text className="font-dmsans-bold text-[15px] tracking-[1.5px] text-black">
+                  <Text
+                    className="font-dmsans-bold text-[15px] tracking-[1.5px] text-black"
+                    style={{ color: colors.text }}
+                  >
                     I ALREADY HAVE AN ACCOUNT
                   </Text>
                 </Pressable>
               </Link>
 
-              <Text className="mt-5 text-center font-dmsans-bold text-xs tracking-[2px] text-neutral-400">
+              <Text
+                className="mt-5 text-center font-dmsans-bold text-xs tracking-[2px] text-neutral-400"
+                style={{ color: colors.textFaint }}
+              >
                 FREE TO START. NO CREDIT CARD REQUIRED.
               </Text>
             </View>

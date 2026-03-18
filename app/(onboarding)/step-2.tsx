@@ -1,17 +1,18 @@
 import OnboardingShell from "@/components/(onboarding)/onboarding-shell";
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-    nextStep,
-    prevStep,
-    updateOnboardingData,
+  nextStep,
+  prevStep,
+  updateOnboardingData,
 } from "@/store/slices/onboardingSlice";
 import { Href, useRouter } from "expo-router";
 import {
-    Dumbbell,
-    Flame,
-    Scale,
-    StretchHorizontal,
-    Timer,
+  Dumbbell,
+  Flame,
+  Scale,
+  StretchHorizontal,
+  Timer,
 } from "lucide-react-native";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
@@ -52,6 +53,7 @@ const goalOptions = [
 const StepTwoScreen = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { colors } = useTheme();
   const { primaryGoal } = useAppSelector((s) => s.onboarding.data);
 
   return (
@@ -70,7 +72,7 @@ const StepTwoScreen = () => {
       }}
       nextDisabled={!primaryGoal}
     >
-      <View className="gap-3">
+      <View style={{ gap: 12 }}>
         {goalOptions.map(({ value, title, description, Icon }) => {
           const active = primaryGoal === value;
           return (
@@ -79,26 +81,36 @@ const StepTwoScreen = () => {
               onPress={() =>
                 dispatch(updateOnboardingData({ primaryGoal: value }))
               }
-              className={`rounded-3xl border-2 p-5 ${
-                active ? "border-black bg-black" : "border-black bg-white"
-              }`}
+              style={{
+                borderRadius: 24,
+                borderWidth: 2,
+                padding: 20,
+                borderColor: active ? colors.border : colors.borderMuted,
+                backgroundColor: active ? colors.text : "transparent",
+              }}
             >
               <Icon
                 size={24}
-                color={active ? "#fff" : "#000"}
+                color={active ? colors.background : colors.text}
                 strokeWidth={2.2}
               />
               <Text
-                className={`mt-3 font-dmsans-bold text-base ${
-                  active ? "text-white" : "text-black"
-                }`}
+                style={{
+                  color: active ? colors.background : colors.text,
+                  marginTop: 12,
+                  fontSize: 15,
+                }}
+                className="font-dmsans-bold"
               >
                 {title}
               </Text>
               <Text
-                className={`mt-1 font-dmsans text-sm ${
-                  active ? "text-white/80" : "text-neutral-500"
-                }`}
+                style={{
+                  color: active ? colors.background + "cc" : colors.textMuted,
+                  marginTop: 4,
+                  fontSize: 13,
+                }}
+                className="font-dmsans"
               >
                 {description}
               </Text>

@@ -36,9 +36,6 @@ export const searchFood = createAsyncThunk(
           },
         },
       );
-
-      // Debugging: Log the raw response data
-      console.log("API Response:", res.data);
       return res.data.results as FoodItem[];
     } catch (err: any) {
       return rejectWithValue(err.message);

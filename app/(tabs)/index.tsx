@@ -6,201 +6,212 @@ import {
 import WorkoutCard from "@/components/(tabs)/home/workout-card";
 import { Button } from "@/components/ui/button";
 import { useGreeting } from "@/lib/hooks/useGreeting";
-import { supabase } from "@/lib/supabase";
-import { useAppSelector } from "@/store/hooks";
-import { workouts } from "@/utils/workouts";
+import { usePedometer } from "@/lib/hooks/usePedometer";
+import { useTheme } from "@/lib/theme/ThemeContext";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchTodayMeals } from "@/store/slices/dailyMealSlice";
+import { fetchProfile } from "@/store/slices/profileSlice";
+import { fetchRecentWorkoutLogs } from "@/store/slices/workoutLogSlice";
+import type { WorkoutPlanDay } from "@/store/slices/workoutPlanSlice";
+import { fetchActivePlans } from "@/store/slices/workoutPlanSlice";
+import {
+  getTodayDayNumber,
+  pickWorkoutForDay,
+  toDurationLabel,
+  toExercisesCount,
+  workouts,
+} from "@/utils/workouts";
 import { Link } from "expo-router";
 import {
   ArrowRight,
   Droplets,
+  Flame,
   Footprints,
   SlidersVertical,
-  Zap,
+  Timer,
 } from "lucide-react-native";
-import React, { useCallback, useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type WorkoutPlan = {
-  id: string;
-  plan_type: "home" | "gym" | string;
-  is_active: boolean;
-  user_id: string;
-};
-
-type WorkoutPlanDay = {
-  id: string;
-  title?: string | null;
-  workout_name?: string | null;
-  name?: string | null;
-  duration?: string | number | null;
-  duration_minutes?: number | null;
-  exercises_count?: number | null;
-  exercises?: unknown;
-  workout_plans: WorkoutPlan;
-};
-
-const toDurationLabel = (row: WorkoutPlanDay, fallbackDuration: string) => {
-  if (typeof row.duration === "string" && row.duration.trim()) {
-    return row.duration;
-  }
-
-  if (typeof row.duration === "number") {
-    return `${row.duration} MIN`;
-  }
-
-  if (typeof row.duration_minutes === "number") {
-    return `${row.duration_minutes} MIN`;
-  }
-
-  return fallbackDuration;
-};
-
-const toExercisesCount = (row: WorkoutPlanDay, fallbackCount: number) => {
-  if (typeof row.exercises_count === "number") {
-    return row.exercises_count;
-  }
-
-  if (Array.isArray(row.exercises)) {
-    return row.exercises.length;
-  }
-
-  return fallbackCount;
+const formatSteps = (steps: number): string => {
+  if (steps >= 1000) return `${(steps / 1000).toFixed(1)}k`;
+  return String(steps);
 };
 
 const HomeScreen = () => {
-  const [gymWorkout, setGymWorkout] = React.useState<WorkoutPlanDay | null>(
-    null,
-  );
-  const [homeWorkout, setHomeWorkout] = React.useState<WorkoutPlanDay | null>(
-    null,
-  );
+  const dispatch = useAppDispatch();
+  const { colors } = useTheme();
   const [workoutType, setWorkoutType] = React.useState<"home" | "gym" | null>(
     null,
   );
+
   const { greeting, day } = useGreeting();
-  const { data } = useAppSelector((s) => s.profile);
-  const { user } = useAppSelector((s) => s.auth);
+  const { data: profile } = useAppSelector((s) => s.profile);
+  const { gymPlan, homePlan } = useAppSelector((s) => s.workoutPlan);
+  const { todayCalories, meals } = useAppSelector((s) => s.dailyMeal);
+  const { logs } = useAppSelector((s) => s.workoutLog);
+
+  const { steps, available: pedometerAvailable } = usePedometer();
+
   const fallbackWorkout =
     workouts.find((w) => w.day?.startsWith(day)) ?? workouts[0];
+  const todayNumber = getTodayDayNumber();
 
+  // ── Fetch on mount ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    dispatch(fetchActivePlans());
+    dispatch(fetchTodayMeals());
+    dispatch(fetchRecentWorkoutLogs(7));
+    if (!profile) dispatch(fetchProfile());
+  }, [dispatch]);
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const calorieGoal = profile?.daily_calorie_target ?? 2000;
+  const waterGoalLiters = profile?.daily_water_goal_liters ?? 2;
+
+  const todayActiveMinutes = useMemo(() => {
+    const todayIso = new Date().toISOString().split("T")[0];
+    return logs
+      .filter((log) => log.completed_at.startsWith(todayIso))
+      .reduce((sum, log) => sum + log.duration_minutes, 0);
+  }, [logs]);
+
+  const macroCalories = useMemo(() => {
+    if (meals.length === 0) return todayCalories;
+    return meals.reduce(
+      (sum, meal) => sum + Number(meal.total_calories ?? 0),
+      0,
+    );
+  }, [meals, todayCalories]);
+
+  const stepsDisplay = pedometerAvailable ? formatSteps(steps) : "--";
+
+  // ── Metric cards ───────────────────────────────────────────────────────────
+  // Flame  → calories burned/consumed today (most relevant to fitness goal)
+  // Droplets → water intake goal (hydration tracking)
+  // Footprints → step count (movement tracking)
+  // Timer  → active workout minutes today
   const keyMetrics: KeyMetrics[] = [
-    { icon: Footprints, value: "8,432", label: "STEPS" },
-    { icon: Droplets, value: "1.2L", label: "WATER" },
-    { icon: Zap, value: "45", label: "MINS" },
+    {
+      icon: Flame,
+      value: macroCalories > 0 ? macroCalories.toLocaleString() : "0",
+      label: "KCAL",
+    },
+    {
+      icon: Droplets,
+      value: `${waterGoalLiters}L`,
+      label: "WATER",
+    },
+    {
+      icon: Footprints,
+      value: stepsDisplay,
+      label: "STEPS",
+    },
+    {
+      icon: Timer,
+      value: todayActiveMinutes > 0 ? `${todayActiveMinutes}` : "0",
+      label: "MINS",
+    },
   ];
 
-  const fetchWorkout = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      const today = new Date();
-      const dayNumber = today.getDay() === 0 ? 7 : today.getDay();
-
-      const { data, error } = await supabase
-        .from("workout_plan_days")
-        .select(
-          `
-        *,
-        workout_plans!inner (
-          id,
-          plan_type,
-          is_active,
-          user_id
-        )
-      `,
-        )
-        .eq("workout_plans.user_id", user?.id)
-        .eq("workout_plans.is_active", true)
-        .eq("day_number", dayNumber)
-        .order("created_at", {
-          referencedTable: "workout_plans",
-          ascending: false,
-        });
-
-      if (error) throw error;
-
-      console.log("[workout] today's workouts fetched", data);
-      const workoutRows = (data ?? []) as WorkoutPlanDay[];
-
-      const homeWorkout = workoutRows.find(
-        (d) => d.workout_plans.plan_type === "home",
-      );
-      const gymWorkout = workoutRows.find(
-        (d) => d.workout_plans.plan_type === "gym",
-      );
-
-      setHomeWorkout(homeWorkout ?? null);
-      setGymWorkout(gymWorkout ?? null);
-    } catch (error) {
-      console.log("[workout] fetch failed", error);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchWorkout();
-  }, [fetchWorkout]);
-
+  // ── Workout type toggle ────────────────────────────────────────────────────
   useEffect(() => {
     setWorkoutType((current) => {
-      if (current === "home" && homeWorkout) return current;
-      if (current === "gym" && gymWorkout) return current;
-      if (homeWorkout) return "home";
-      if (gymWorkout) return "gym";
+      if (current === "home" && homePlan) return current;
+      if (current === "gym" && gymPlan) return current;
+      if (homePlan) return "home";
+      if (gymPlan) return "gym";
       return null;
     });
-  }, [homeWorkout, gymWorkout]);
+  }, [homePlan, gymPlan]);
 
   const handleToggleWorkoutType = () => {
-    if (homeWorkout && gymWorkout) {
+    if (homePlan && gymPlan) {
       setWorkoutType((current) => (current === "home" ? "gym" : "home"));
       return;
     }
-
-    if (homeWorkout) {
+    if (homePlan) {
       setWorkoutType("home");
       return;
     }
-
-    if (gymWorkout) {
+    if (gymPlan) {
       setWorkoutType("gym");
       return;
     }
-
     setWorkoutType(null);
   };
 
-  const workout =
-    workoutType === "home"
-      ? homeWorkout
-      : workoutType === "gym"
-        ? gymWorkout
-        : (homeWorkout ?? gymWorkout);
+  // ── Today's workout ────────────────────────────────────────────────────────
+  const todayWorkout: WorkoutPlanDay | typeof fallbackWorkout | null = (() => {
+    if (workoutType === "home") {
+      return (
+        pickWorkoutForDay(homePlan?.workout_plan_days, todayNumber) ??
+        fallbackWorkout
+      );
+    }
+    if (workoutType === "gym") {
+      return (
+        pickWorkoutForDay(gymPlan?.workout_plan_days, todayNumber) ??
+        fallbackWorkout
+      );
+    }
+    return (
+      pickWorkoutForDay(homePlan?.workout_plan_days, todayNumber) ??
+      pickWorkoutForDay(gymPlan?.workout_plan_days, todayNumber) ??
+      homePlan?.workout_plan_days?.[0] ??
+      gymPlan?.workout_plan_days?.[0] ??
+      fallbackWorkout
+    );
+  })();
 
-  const workoutCardData = workout
-    ? {
-        id: Number(workout.id) || fallbackWorkout.id,
-        title:
-          workout.title ??
-          workout.workout_name ??
-          workout.name ??
-          fallbackWorkout.title,
-        image: fallbackWorkout.image,
-        duration: toDurationLabel(workout, fallbackWorkout.duration),
-        exercisesCount: toExercisesCount(
-          workout,
-          fallbackWorkout.exercisesCount,
-        ),
-      }
-    : null;
+  const isRestDay =
+    todayWorkout &&
+    "is_rest_day" in todayWorkout &&
+    todayWorkout.is_rest_day === true;
+
+  const workoutCardData =
+    todayWorkout && !isRestDay
+      ? {
+          id: fallbackWorkout.id,
+          title:
+            ("title" in todayWorkout ? todayWorkout.title : null) ??
+            fallbackWorkout.title,
+          image: fallbackWorkout.image,
+          duration: toDurationLabel(
+            todayWorkout as WorkoutPlanDay,
+            fallbackWorkout.duration,
+          ),
+          exercisesCount: toExercisesCount(
+            todayWorkout as WorkoutPlanDay,
+            fallbackWorkout.exercisesCount,
+          ),
+        }
+      : null;
 
   return (
-    <SafeAreaView className="flex-1">
-      <View className="px-4 flex-row items-center justify-between">
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Header */}
+      <View
+        style={{
+          paddingHorizontal: 16,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
         <View>
-          <Text className="text-xl font-semibold font-dmsans">{greeting}</Text>
-          <Text className="text-2xl font-dmsans-bold">
-            {data?.full_name || "User"}
+          <Text
+            style={{ color: colors.textMuted }}
+            className="text-base font-dmsans"
+          >
+            {greeting}
+          </Text>
+          <Text
+            style={{ color: colors.text }}
+            className="text-2xl font-dmsans-bold"
+          >
+            {profile?.full_name || "User"}
           </Text>
         </View>
         <Button
@@ -209,47 +220,119 @@ const HomeScreen = () => {
           onPress={handleToggleWorkoutType}
           className="mt-0"
         >
-          <SlidersVertical size={24} color="black" strokeWidth={1.5} />
+          <SlidersVertical size={24} color={colors.text} strokeWidth={1.5} />
         </Button>
       </View>
+
       <ScrollView
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-4 mt-16 flex-row items-center justify-center ">
-          <CalorieRing goal={2500} intake={1850} size={255} />
+        {/* Calorie ring */}
+        <View
+          style={{
+            paddingHorizontal: 16,
+            marginTop: 32,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <CalorieRing goal={calorieGoal} intake={macroCalories} size={255} />
         </View>
-        <View className="px-4 mt-16 flex-row items-center justify-center gap-4">
+
+        {/* Metric cards — 2x2 grid */}
+        <View
+          style={{
+            paddingHorizontal: 16,
+            marginTop: 24,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
           {keyMetrics.map((metric, index) => (
-            <MetricCard
-              key={index}
-              icon={metric.icon}
-              value={metric.value}
-              label={metric.label}
-            />
+            <View key={index} style={{ width: "47%" }}>
+              <MetricCard
+                icon={metric.icon}
+                value={metric.value}
+                label={metric.label}
+              />
+            </View>
           ))}
         </View>
-        <View className="px-4 my-16 border-2 border-black max-w-32 w-full mx-auto rounded-xl" />
 
-        <View className="px-4 mb-4 flex-row items-center justify-between">
+        {/* Divider */}
+        <View
+          style={{
+            marginHorizontal: "auto",
+            marginVertical: 32,
+            width: 128,
+            height: 2,
+            borderRadius: 999,
+            backgroundColor: colors.border,
+          }}
+        />
+
+        {/* Today's workout header */}
+        <View
+          style={{
+            paddingHorizontal: 16,
+            marginBottom: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <View>
-            <Text className="text-2xl font-dmsans-bold leading-none">
-              Today&apos;s Workout
+            <Text
+              style={{ color: colors.text }}
+              className="text-2xl font-dmsans-bold leading-none"
+            >
+              Today's Workout
             </Text>
-            <Text className="text-sm text-gray-600 leading-none font-dmsans">
+            <Text
+              style={{ color: colors.textMuted, marginTop: 2 }}
+              className="text-sm font-dmsans"
+            >
               {day}
             </Text>
           </View>
           <Link href="/workouts" asChild>
             <Button variant="ghost" size="icon" className="mt-0">
-              <ArrowRight size={24} color="black" />
+              <ArrowRight size={24} color={colors.text} strokeWidth={1.5} />
             </Button>
           </Link>
         </View>
 
-        {/* Workout Cards */}
-        <View className="px-4">
-          {workoutCardData ? (
+        {/* Workout card */}
+        <View style={{ paddingHorizontal: 16 }}>
+          {isRestDay ? (
+            <View
+              style={{
+                width: "100%",
+                height: 160,
+                borderWidth: 2,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                borderColor: colors.borderMuted,
+                backgroundColor: colors.card,
+              }}
+            >
+              <Text
+                style={{ color: colors.textMuted }}
+                className="font-dmsans text-lg"
+              >
+                Rest Day
+              </Text>
+              <Text
+                style={{ color: colors.textFaint, marginTop: 4 }}
+                className="font-dmsans text-sm"
+              >
+                Recovery is part of the plan.
+              </Text>
+            </View>
+          ) : workoutCardData ? (
             <WorkoutCard
               id={workoutCardData.id}
               title={workoutCardData.title}
@@ -258,8 +341,22 @@ const HomeScreen = () => {
               exercisesCount={workoutCardData.exercisesCount}
             />
           ) : (
-            <View className="w-full h-48 border-2 border-gray-300 rounded-xl items-center justify-center">
-              <Text className="text-gray-500 font-dmsans">
+            <View
+              style={{
+                width: "100%",
+                height: 160,
+                borderWidth: 2,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                borderColor: colors.borderMuted,
+                backgroundColor: colors.card,
+              }}
+            >
+              <Text
+                style={{ color: colors.textMuted }}
+                className="font-dmsans text-sm"
+              >
                 No workout scheduled for today.
               </Text>
             </View>
