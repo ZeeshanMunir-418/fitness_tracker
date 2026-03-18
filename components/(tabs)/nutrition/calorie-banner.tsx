@@ -1,4 +1,5 @@
 import { useAnimation } from "@/lib/hooks/useAnimation";
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { Flame } from "lucide-react-native";
 import React from "react";
 import { Text, View } from "react-native";
@@ -13,6 +14,7 @@ export const CalorieBanner: React.FC<CalorieBannerProps> = ({
   intake,
   goal,
 }) => {
+  const { colors } = useTheme();
   const size = 128;
   const strokeWidth = 14;
   const radius = (size - strokeWidth) / 2;
@@ -26,13 +28,24 @@ export const CalorieBanner: React.FC<CalorieBannerProps> = ({
     <View className="flex-row items-center px-4 py-3">
       {/* Left: consumed */}
       <View>
-        <Text className="text-base font-dmsans text-neutral-400 uppercase tracking-widest">
+        <Text
+          className="text-base font-dmsans text-neutral-400 uppercase tracking-widest"
+          style={{ color: colors.textFaint }}
+        >
           Consumed
         </Text>
-        <Text className="text-4xl font-dmsans-bold text-black">
+        <Text
+          className="text-2xl font-dmsans-bold text-black"
+          style={{ color: colors.text }}
+        >
           {intake.toLocaleString()}
         </Text>
-        <Text className="text-base font-dmsans text-neutral-400">kcal</Text>
+        <Text
+          className="text-base font-dmsans text-neutral-400"
+          style={{ color: colors.textFaint }}
+        >
+          kcal
+        </Text>
       </View>
 
       {/* Center: mini ring */}
@@ -42,7 +55,7 @@ export const CalorieBanner: React.FC<CalorieBannerProps> = ({
             cx={center}
             cy={center}
             r={radius}
-            stroke="#E5E5E5"
+            stroke={colors.borderMuted}
             strokeWidth={strokeWidth}
             fill="none"
             strokeLinecap="round"
@@ -51,7 +64,7 @@ export const CalorieBanner: React.FC<CalorieBannerProps> = ({
             cx={center}
             cy={center}
             r={radius}
-            stroke="#000"
+            stroke={colors.border}
             strokeWidth={strokeWidth}
             fill="none"
             strokeLinecap="round"
@@ -62,19 +75,30 @@ export const CalorieBanner: React.FC<CalorieBannerProps> = ({
           />
         </Svg>
         <View className="absolute inset-0 items-center justify-center">
-          <Flame size={30} color="#000" />
+          <Flame size={30} color={colors.text} />
         </View>
       </View>
 
       {/* Right: goal */}
       <View className="items-end">
-        <Text className="text-base font-dmsans text-neutral-400 uppercase tracking-widest">
+        <Text
+          className="text-base font-dmsans text-neutral-400 uppercase tracking-widest"
+          style={{ color: colors.textFaint }}
+        >
           Goal
         </Text>
-        <Text className="text-4xl font-dmsans-bold text-black">
+        <Text
+          className="text-2xl font-dmsans-bold text-black"
+          style={{ color: colors.text }}
+        >
           {goal.toLocaleString()}
         </Text>
-        <Text className="text-base text-neutral-400 font-dmsans">kcal</Text>
+        <Text
+          className="text-base text-neutral-400 font-dmsans"
+          style={{ color: colors.textFaint }}
+        >
+          kcal
+        </Text>
       </View>
     </View>
   );

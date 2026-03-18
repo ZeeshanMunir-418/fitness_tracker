@@ -9,3 +9,13 @@ entrypoint = "./functions/fatsecret-search/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/fatsecret-search/*.html" ]
+
+[functions.send-push-notification]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/send-push-notification/index.ts"
+
+[functions.schedule-reminders]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/schedule-reminders/index.ts"

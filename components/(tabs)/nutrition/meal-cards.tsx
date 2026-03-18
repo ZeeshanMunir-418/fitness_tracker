@@ -1,7 +1,29 @@
-import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react-native";
+import { useTheme } from "@/lib/theme/ThemeContext";
+import {
+  Apple,
+  ChevronDown,
+  ChevronUp,
+  Coffee,
+  Moon,
+  Sun,
+  UtensilsCrossed,
+} from "lucide-react-native";
 import React from "react";
-import { Text, View } from "react-native";
+import {
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  Text,
+  UIManager,
+  View,
+} from "react-native";
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface FoodItem {
   foodName: string;
@@ -16,79 +38,235 @@ interface MealCardProps {
   setOpenDropDown: (key: string | null) => void;
   foodItems: FoodItem[];
   meal: string;
-  mealKey: string; // add this
+  mealKey: string;
   totalCalories: number;
   mealInitials: string;
 }
+
+const MEAL_ICONS: Record<
+  string,
+  React.ComponentType<{ size: number; color: string; strokeWidth: number }>
+> = {
+  breakfast: Coffee,
+  lunch: Sun,
+  dinner: Moon,
+  snacks: Apple,
+};
+
+const MEAL_DESCRIPTIONS: Record<string, string> = {
+  breakfast: "Start your day right",
+  lunch: "Midday fuel",
+  dinner: "Evening meal",
+  snacks: "Between meals",
+};
+
 export const MealCard = ({
   openDropDown,
   setOpenDropDown,
   meal,
-  mealInitials,
   mealKey,
   foodItems,
   totalCalories,
 }: MealCardProps) => {
+  const { colors } = useTheme();
+  const MealIcon = MEAL_ICONS[mealKey] ?? UtensilsCrossed;
+  const hasItems = foodItems.length > 0;
+
+  const handleToggle = () => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(200, "easeInEaseOut", "opacity"),
+    );
+    setOpenDropDown(openDropDown ? null : mealKey);
+  };
+
   return (
-    <View className="border-2 border-black rounded-[28px] overflow-hidden">
-      <Button
-        onPress={() => setOpenDropDown(openDropDown ? null : mealKey)}
-        variant="ghost"
-        className="mt-0 flex-row items-center justify-between border-0 px-4 py-3"
+    <View
+      style={{
+        borderWidth: 2,
+        borderRadius: 20,
+        overflow: "hidden",
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+        marginBottom: 4,
+      }}
+    >
+      {/* Header row */}
+      <Pressable
+        onPress={handleToggle}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+        }}
       >
-        <View className="flex-row items-center gap-3">
-          <View className="rounded-full bg-black size-9 items-center justify-center">
-            <Text className="font-dmsans-bold text-white text-sm">
-              {mealInitials}
+        {/* Left: icon + name */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 999,
+              backgroundColor: colors.text,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <MealIcon size={18} color={colors.background} strokeWidth={1.8} />
+          </View>
+          <View>
+            <Text
+              style={{ color: colors.text, fontSize: 15 }}
+              className="font-dmsans-bold uppercase tracking-wide"
+            >
+              {meal}
+            </Text>
+            <Text
+              style={{ color: colors.textFaint, fontSize: 11, marginTop: 2 }}
+              className="font-dmsans"
+            >
+              {hasItems
+                ? `${foodItems.length} item${foodItems.length > 1 ? "s" : ""}`
+                : (MEAL_DESCRIPTIONS[mealKey] ?? "No items logged")}
             </Text>
           </View>
-          <Text className="font-dmsans-bold text-lg uppercase">{meal}</Text>
         </View>
-        <View className="flex-row items-center gap-3">
-          <View className="items-end">
-            <Text className="text-3xl font-dmsans-bold leading-none">
+
+        {/* Right: calories + chevron */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text
+              style={{ color: colors.text, fontSize: 22, lineHeight: 24 }}
+              className="font-dmsans-bold"
+            >
               {totalCalories}
             </Text>
-            <Text className="text-[10px] font-dmsans uppercase tracking-widest text-neutral-500 leading-none mt-1">
+            <Text
+              style={{
+                color: colors.textFaint,
+                fontSize: 10,
+                letterSpacing: 1.5,
+                marginTop: 2,
+              }}
+              className="font-dmsans uppercase"
+            >
               kcal
             </Text>
           </View>
           {openDropDown ? (
-            <ChevronUp size={24} color="#000" />
+            <ChevronUp size={20} color={colors.textMuted} strokeWidth={1.5} />
           ) : (
-            <ChevronDown size={24} color="#000" />
+            <ChevronDown size={20} color={colors.textMuted} strokeWidth={1.5} />
           )}
         </View>
-      </Button>
+      </Pressable>
 
+      {/* Expanded food items */}
       {openDropDown && (
-        <View className="border-t-2 border-black px-4 py-3 gap-3">
-          {foodItems.map((item, index) => (
-            <View key={index}>
-              <View className="flex-row items-center justify-between">
-                <Text className="font-dmsans-bold text-base flex-1 mr-4">
-                  {item.foodName}
-                </Text>
-                <Text className="font-dmsans-bold text-2xl leading-none">
-                  {item.calories}
-                </Text>
+        <View
+          style={{
+            borderTopWidth: 2,
+            borderTopColor: colors.cardBorder,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            gap: 12,
+          }}
+        >
+          {hasItems ? (
+            foodItems.map((item, index) => (
+              <View key={index}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text
+                    style={{ color: colors.text, flex: 1, marginRight: 12 }}
+                    className="font-dmsans-bold text-sm"
+                  >
+                    {item.foodName}
+                  </Text>
+                  <Text
+                    style={{ color: colors.text }}
+                    className="font-dmsans-bold text-lg"
+                  >
+                    {item.calories}
+                    <Text
+                      style={{ color: colors.textFaint, fontSize: 11 }}
+                      className="font-dmsans"
+                    >
+                      {" "}
+                      kcal
+                    </Text>
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 16,
+                    marginTop: 4,
+                  }}
+                >
+                  {[
+                    { label: "Protein", value: item.proteinGrams },
+                    { label: "Carbs", value: item.carbsGrams },
+                    { label: "Fat", value: item.fatGrams },
+                  ].map((macro) => (
+                    <View
+                      key={macro.label}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 3,
+                      }}
+                    >
+                      <Text
+                        style={{ color: colors.textFaint, fontSize: 11 }}
+                        className="font-dmsans"
+                      >
+                        {macro.label}
+                      </Text>
+                      <Text
+                        style={{ color: colors.textMuted, fontSize: 11 }}
+                        className="font-dmsans-bold"
+                      >
+                        {macro.value}g
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                {index < foodItems.length - 1 && (
+                  <View
+                    style={{
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.cardBorder,
+                      marginTop: 10,
+                    }}
+                  />
+                )}
               </View>
-              <View className="flex-row gap-4 mt-1">
-                <Text className="text-xs text-neutral-500 font-dmsans">
-                  P: {item.proteinGrams}g
-                </Text>
-                <Text className="text-xs text-neutral-500 font-dmsans">
-                  C: {item.carbsGrams}g
-                </Text>
-                <Text className="text-xs text-neutral-500 font-dmsans">
-                  F: {item.fatGrams}g
-                </Text>
-              </View>
-              {index < foodItems.length - 1 && (
-                <View className="border-b border-neutral-200 mt-3" />
-              )}
+            ))
+          ) : (
+            /* Empty state */
+            <View
+              style={{
+                alignItems: "center",
+                paddingVertical: 16,
+                gap: 6,
+              }}
+            >
+              <MealIcon size={28} color={colors.textFaint} strokeWidth={1.2} />
+              <Text
+                style={{ color: colors.textMuted, fontSize: 13 }}
+                className="font-dmsans"
+              >
+                No {meal.toLowerCase()} logged yet
+              </Text>
             </View>
-          ))}
+          )}
         </View>
       )}
     </View>

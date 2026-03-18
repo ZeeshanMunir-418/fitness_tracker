@@ -1,6 +1,5 @@
 import { supabase } from "@/lib/supabase";
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import axios, { AxiosError } from "axios";
 import { RootState } from "../index";
 
 export type Gender = "male" | "female" | "prefer_not_to_say" | null;
@@ -107,7 +106,6 @@ export const saveOnboardingProfile = createAsyncThunk<
 >(
   "onboarding/saveOnboardingProfile",
   async (_, { getState, rejectWithValue }) => {
-    console.log("[onboarding] saveOnboardingProfile: start");
     const state = getState();
     const { data } = state.onboarding;
 
@@ -222,7 +220,6 @@ export const saveOnboardingProfile = createAsyncThunk<
     const fnName = "personalized_workout_and_meal_plan";
 
     try {
-      console.log("[onboarding] calling edge function", fnName);
       const { data: fnData, error: fnError } = await supabase.functions.invoke(
         fnName,
         {
@@ -245,15 +242,12 @@ export const saveOnboardingProfile = createAsyncThunk<
         }
         return rejectWithValue(message);
       }
-
-      console.log("[onboarding] edge function response", fnData);
     } catch (error) {
       console.error("[onboarding] fn call failed", error);
       const message =
         error instanceof Error ? error.message : "Something went wrong";
       return rejectWithValue(message);
     }
-    console.log("[onboarding] saveOnboardingProfile: success");
   },
 );
 

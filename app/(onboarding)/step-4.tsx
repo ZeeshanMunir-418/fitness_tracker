@@ -1,9 +1,10 @@
 import OnboardingShell from "@/components/(onboarding)/onboarding-shell";
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-    nextStep,
-    prevStep,
-    updateOnboardingData,
+  nextStep,
+  prevStep,
+  updateOnboardingData,
 } from "@/store/slices/onboardingSlice";
 import { Href, useRouter } from "expo-router";
 import React from "react";
@@ -27,6 +28,7 @@ const durations = [
 const StepFourScreen = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { colors } = useTheme();
   const { preferredWorkoutType, workoutDuration, workoutDaysPerWeek } =
     useAppSelector((s) => s.onboarding.data);
 
@@ -49,9 +51,13 @@ const StepFourScreen = () => {
       }}
       nextDisabled={nextDisabled}
     >
-      <View className="gap-6">
-        <View className="gap-2">
-          <Text className="font-dmsans text-xs uppercase tracking-widest text-neutral-500">
+      <View style={{ gap: 24 }}>
+        {/* ── Workout Type ─────────────────────────────────────────────── */}
+        <View style={{ gap: 8 }}>
+          <Text
+            style={{ color: colors.textMuted }}
+            className="font-dmsans text-xs uppercase tracking-widest"
+          >
             Workout Type
           </Text>
           <View className="flex-row flex-wrap gap-2">
@@ -67,14 +73,21 @@ const StepFourScreen = () => {
                       }),
                     )
                   }
-                  className={`rounded-full px-4 py-3 ${
-                    active ? "bg-black" : "border-2 border-black bg-white"
-                  }`}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderRadius: 999,
+                    borderWidth: 2,
+                    borderColor: active ? colors.border : colors.borderMuted,
+                    backgroundColor: active ? colors.text : "transparent",
+                  }}
                 >
                   <Text
-                    className={`font-dmsans-bold text-sm ${
-                      active ? "text-white" : "text-black"
-                    }`}
+                    style={{
+                      color: active ? colors.background : colors.text,
+                      fontSize: 13,
+                    }}
+                    className="font-dmsans-bold"
                   >
                     {option.label}
                   </Text>
@@ -84,8 +97,12 @@ const StepFourScreen = () => {
           </View>
         </View>
 
-        <View className="gap-2">
-          <Text className="font-dmsans text-xs uppercase tracking-widest text-neutral-500">
+        {/* ── Session Duration ─────────────────────────────────────────── */}
+        <View style={{ gap: 8 }}>
+          <Text
+            style={{ color: colors.textMuted }}
+            className="font-dmsans text-xs uppercase tracking-widest"
+          >
             Session Duration
           </Text>
           <View className="flex-row flex-wrap gap-2">
@@ -99,14 +116,21 @@ const StepFourScreen = () => {
                       updateOnboardingData({ workoutDuration: option.value }),
                     )
                   }
-                  className={`rounded-full px-4 py-3 ${
-                    active ? "bg-black" : "border-2 border-black bg-white"
-                  }`}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderRadius: 999,
+                    borderWidth: 2,
+                    borderColor: active ? colors.border : colors.borderMuted,
+                    backgroundColor: active ? colors.text : "transparent",
+                  }}
                 >
                   <Text
-                    className={`font-dmsans-bold text-sm ${
-                      active ? "text-white" : "text-black"
-                    }`}
+                    style={{
+                      color: active ? colors.background : colors.text,
+                      fontSize: 13,
+                    }}
+                    className="font-dmsans-bold"
                   >
                     {option.label}
                   </Text>
@@ -116,8 +140,12 @@ const StepFourScreen = () => {
           </View>
         </View>
 
-        <View className="gap-2">
-          <Text className="font-dmsans text-xs uppercase tracking-widest text-neutral-500">
+        {/* ── Days Per Week ────────────────────────────────────────────── */}
+        <View style={{ gap: 8 }}>
+          <Text
+            style={{ color: colors.textMuted }}
+            className="font-dmsans text-xs uppercase tracking-widest"
+          >
             Workout Days Per Week
           </Text>
           <View className="flex-row items-center justify-between">
@@ -130,14 +158,23 @@ const StepFourScreen = () => {
                   onPress={() =>
                     dispatch(updateOnboardingData({ workoutDaysPerWeek: day }))
                   }
-                  className={`h-11 w-11 items-center justify-center rounded-full ${
-                    active ? "bg-black" : "border-2 border-black bg-white"
-                  }`}
+                  style={{
+                    height: 44,
+                    width: 44,
+                    borderRadius: 999,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 2,
+                    borderColor: active ? colors.border : colors.borderMuted,
+                    backgroundColor: active ? colors.text : "transparent",
+                  }}
                 >
                   <Text
-                    className={`font-dmsans-bold text-sm ${
-                      active ? "text-white" : "text-black"
-                    }`}
+                    style={{
+                      color: active ? colors.background : colors.text,
+                      fontSize: 13,
+                    }}
+                    className="font-dmsans-bold"
                   >
                     {day}
                   </Text>

@@ -1,3 +1,4 @@
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppSelector } from "@/store/hooks";
 import { Tabs, useRouter } from "expo-router";
 import { Activity, Dumbbell, Home, User, Utensils } from "lucide-react-native";
@@ -16,6 +17,7 @@ type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 const TabsLayout = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const { session, initialized } = useAppSelector((s) => s.auth);
 
   const tabBarBottom = Math.max(insets.bottom, 12) + 12;
@@ -25,30 +27,32 @@ const TabsLayout = () => {
     if (!session) router.replace("/(auth)/login");
   }, [session, initialized, router]);
 
-  const renderTabIcon =
-    (Icon: IconComponent) =>
-    ({ color, size, focused }: TabIconProps) => (
+  const renderTabIcon = (Icon: IconComponent, props: TabIconProps) => {
+    const { color, size, focused } = props;
+
+    return (
       <View
         className="p-2"
         style={{
           borderRadius: 999,
-          backgroundColor: focused ? "#111827" : "transparent",
+          backgroundColor: focused ? colors.border : "transparent",
         }}
       >
-        <Icon size={size} color={focused ? "#ffffff" : color} />
+        <Icon size={size} color={focused ? colors.background : color} />
       </View>
     );
+  };
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#000000",
-        tabBarInactiveTintColor: "#9ca3af",
+        tabBarActiveTintColor: colors.text,
+        tabBarInactiveTintColor: colors.textFaint,
         tabBarLabel: () => null,
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          backgroundColor: "#fff",
+          backgroundColor: colors.inputBg,
           borderTopWidth: 0,
           elevation: 5,
           height: 54,
@@ -59,7 +63,7 @@ const TabsLayout = () => {
           position: "absolute",
           bottom: tabBarBottom,
           borderRadius: 30,
-          shadowOpacity: 0,
+          shadowOpacity: isDark ? 0 : 0.08,
         },
       }}
     >
@@ -67,35 +71,35 @@ const TabsLayout = () => {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: renderTabIcon(Home),
+          tabBarIcon: (props) => renderTabIcon(Home, props),
         }}
       />
       <Tabs.Screen
         name="nutrition"
         options={{
           title: "Nutrition",
-          tabBarIcon: renderTabIcon(Utensils),
+          tabBarIcon: (props) => renderTabIcon(Utensils, props),
         }}
       />
       <Tabs.Screen
         name="activity"
         options={{
           title: "Activity",
-          tabBarIcon: renderTabIcon(Activity),
+          tabBarIcon: (props) => renderTabIcon(Activity, props),
         }}
       />
       <Tabs.Screen
         name="workouts"
         options={{
           title: "Workout",
-          tabBarIcon: renderTabIcon(Dumbbell),
+          tabBarIcon: (props) => renderTabIcon(Dumbbell, props),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: renderTabIcon(User),
+          tabBarIcon: (props) => renderTabIcon(User, props),
         }}
       />
     </Tabs>

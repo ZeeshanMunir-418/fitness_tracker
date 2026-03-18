@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { ChevronLeft } from "lucide-react-native";
 import React from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -27,11 +28,19 @@ const OnboardingShell = ({
   nextDisabled = false,
   children,
 }: OnboardingShellProps) => {
+  const { colors } = useTheme();
+
   const progressPercent =
     `${Math.max(0, Math.min(100, (step / totalSteps) * 100))}%` as `${number}%`;
 
   return (
-    <SafeAreaView className="flex-1 bg-white px-6">
+    <SafeAreaView
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        paddingHorizontal: 24,
+      }}
+    >
       <View className="mt-2 flex-row items-center justify-between">
         <Button
           onPress={onBack}
@@ -40,22 +49,41 @@ const OnboardingShell = ({
           size="icon"
           className="mt-0 h-10 w-10 items-center justify-center"
         >
-          <ChevronLeft size={20} color="#000" strokeWidth={2.5} />
+          <ChevronLeft size={20} color={colors.text} strokeWidth={2.5} />
         </Button>
-        <Text className="font-dmsans text-sm text-neutral-500">
+        <Text
+          style={{ color: colors.textMuted }}
+          className="font-dmsans text-sm"
+        >
           {step} / {totalSteps}
         </Text>
       </View>
 
-      <View className="mt-4 h-1 overflow-hidden rounded-full border border-black">
-        <View className="h-full bg-black" style={{ width: progressPercent }} />
+      {/* Progress bar */}
+      <View
+        style={{ borderColor: colors.border, borderWidth: 1 }}
+        className="mt-4 h-1 overflow-hidden rounded-full"
+      >
+        <View
+          style={{
+            width: progressPercent,
+            height: "100%",
+            backgroundColor: colors.text,
+          }}
+        />
       </View>
 
-      <Text className="mt-6 font-dmsans-bold text-3xl uppercase tracking-tight text-black">
+      <Text
+        style={{ color: colors.text }}
+        className="mt-6 font-dmsans-bold text-3xl uppercase tracking-tight"
+      >
         {title}
       </Text>
       {subtitle ? (
-        <Text className="mt-2 font-dmsans text-sm leading-5 text-neutral-500">
+        <Text
+          style={{ color: colors.textMuted }}
+          className="mt-2 font-dmsans text-sm leading-5"
+        >
           {subtitle}
         </Text>
       ) : null}
@@ -72,9 +100,15 @@ const OnboardingShell = ({
         <Button
           onPress={onNext}
           disabled={nextDisabled}
-          className={`mt-0 w-full px-6 py-5 ${nextDisabled ? "bg-black/30" : "bg-black"}`}
+          style={{
+            backgroundColor: nextDisabled ? colors.textFaint : colors.text,
+          }}
+          className="mt-0 w-full px-6 py-5"
         >
-          <Text className="font-dmsans-bold text-[15px] tracking-[1.8px] text-white">
+          <Text
+            style={{ color: colors.background }}
+            className="font-dmsans-bold text-[15px] tracking-[1.8px]"
+          >
             {nextLabel}
           </Text>
         </Button>

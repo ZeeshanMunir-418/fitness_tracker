@@ -1,4 +1,5 @@
 import { Workout } from "@/components/(tabs)/home/workout-card";
+import { WorkoutPlanDay } from "@/store/slices/workoutPlanSlice";
 
 export const workouts: Workout[] = [
   {
@@ -41,4 +42,40 @@ export const workouts: Workout[] = [
     exercisesCount: 12,
     day: "Thursday, 19 March",
   },
-]
+];
+
+export const getTodayDayNumber = () => {
+  const today = new Date().getDay();
+  return today === 0 ? 7 : today;
+};
+
+export const toDurationLabel = (
+  row: WorkoutPlanDay,
+  fallback: string,
+): string => {
+  if (typeof row.duration_minutes === "number") {
+    return `${row.duration_minutes} MIN`;
+  }
+  return fallback;
+};
+
+export const toExercisesCount = (
+  row: WorkoutPlanDay,
+  fallback: number,
+): number => {
+  if (typeof row.exercises_count === "number") {
+    return row.exercises_count;
+  }
+  if (Array.isArray(row.exercises)) {
+    return row.exercises.length;
+  }
+  return fallback;
+};
+
+export const pickWorkoutForDay = (
+  days: WorkoutPlanDay[] | undefined,
+  dayNumber: number,
+): WorkoutPlanDay | null => {
+  if (!days?.length) return null;
+  return days.find((d) => d.day_number === dayNumber) ?? null;
+};

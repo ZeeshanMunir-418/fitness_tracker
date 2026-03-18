@@ -1,8 +1,10 @@
+import { useTheme } from "@/lib/theme/ThemeContext";
 import { Stack, usePathname } from "expo-router";
 import React, { useEffect } from "react";
 import { BackHandler } from "react-native";
 
 const OnboardingLayout = () => {
+  const { colors } = useTheme();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -22,7 +24,11 @@ const OnboardingLayout = () => {
 
   return (
     <Stack
-      screenOptions={{ headerShown: false, animation: "slide_from_right" }}
+      screenOptions={{
+        headerShown: false,
+        animation: "slide_from_right",
+        contentStyle: { backgroundColor: colors.background },
+      }}
     />
   );
 };

@@ -9,9 +9,23 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.zaindotdev.apexfitnesscoach"
+      "bundleIdentifier": "com.zaindotdev.apexfitnesscoach",
+      "infoPlist": {
+        "NSMotionUsageDescription": "Allow Apex Fitness Coach to track your steps.",
+        "UIBackgroundModes": ["fetch", "remote-notification"]
+      }
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "com.google.android.gms.permission.ACTIVITY_RECOGNITION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/icon.png"
@@ -30,10 +44,7 @@
               "pathPrefix": "/callback"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
@@ -47,16 +58,30 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logo.png",
+          "image": "./assets/images/icon.png",
           "imageWidth": 150,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
-            "image": "./assets/images/logo.png",
+            "image": "./assets/images/icon.png",
             "imageWidth": 150,
             "resizeMode": "contain",
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow Apex Fitness Coach to track your steps."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#000000",
+          "androidMode": "default",
+          "androidCollapsedTitle": "%(appName)s"
         }
       ],
       "expo-font",
@@ -67,6 +92,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1745ad56-0f61-4e85-986a-4d39e1a62edc"
+      }
     }
   }
 }
