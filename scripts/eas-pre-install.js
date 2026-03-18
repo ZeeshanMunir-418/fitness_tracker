@@ -25,6 +25,15 @@ function validateJson(jsonText) {
   }
 }
 
+function isEasBuildContext() {
+  return (
+    process.env.EAS_BUILD === "true" ||
+    Boolean(process.env.EAS_LOCAL_BUILD_WORKINGDIR) ||
+    Boolean(process.env.EAS_BUILD_PLATFORM) ||
+    Boolean(process.env.EAS_BUILD_RUNNER)
+  );
+}
+
 function main() {
   const rawJson = process.env.GOOGLE_SERVICES_JSON;
   const rawBase64 = process.env.GOOGLE_SERVICES_JSON_BASE64;
@@ -50,9 +59,9 @@ function main() {
     return;
   }
 
-  if (process.env.EAS_BUILD === "true") {
+  if (isEasBuildContext()) {
     console.error(
-      "[eas-pre-install] Missing GOOGLE_SERVICES_JSON/GOOGLE_SERVICES_JSON_BASE64 and google-services.json file.",
+      "[eas-pre-install] Missing GOOGLE_SERVICES_JSON/GOOGLE_SERVICES_JSON_BASE64 and google-services.json file. Add google-services.json to the EAS upload (for example via .easignore) or provide one of the env vars.",
     );
     process.exit(1);
   }
