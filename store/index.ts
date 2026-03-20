@@ -3,6 +3,9 @@ import authReducer from "./slices/authSlice";
 import dailyMealReducer from "./slices/dailyMealSlice";
 import foodItemReducer from "./slices/foodItemSlice";
 import mealPlanReducer from "./slices/mealPlanSlice";
+import notificationReducer, {
+    type NotificationState,
+} from "./slices/notificationSlice";
 import nutritionReducer from "./slices/nutritionSlice";
 import onboardingReducer from "./slices/onboardingSlice";
 import profileReducer from "./slices/profileSlice";
@@ -17,6 +20,10 @@ export const store = configureStore({
     foodItem: foodItemReducer,
     mealPlan: mealPlanReducer,
     onboarding: onboardingReducer,
+    notifications: notificationReducer as (
+      state: NotificationState | undefined,
+      action: { type: string; payload?: unknown },
+    ) => NotificationState,
     nutrition: nutritionReducer,
     profile: profileReducer,
     theme: themeReducer,

@@ -17,6 +17,7 @@
     },
     "android": {
       "googleServicesFile": "./google-services.json",
+      "useNextNotificationsApi": true,
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "com.google.android.gms.permission.ACTIVITY_RECOGNITION",
@@ -79,7 +80,10 @@
       [
         "expo-notifications",
         {
-          "color": "#000000",
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default",
+          "sounds": [],
           "androidMode": "default",
           "androidCollapsedTitle": "%(appName)s"
         }

@@ -1,14 +1,16 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
+import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { signOut } from "@/store/slices/authSlice";
+import { selectUnreadCount } from "@/store/slices/notificationSlice";
 import { fetchProfile } from "@/store/slices/profileSlice";
 import { clearThemePreference, toggleTheme } from "@/store/slices/themeSlice";
 import { useRouter } from "expo-router";
 import { ChevronRight, LogOut, Verified } from "lucide-react-native";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -31,11 +33,65 @@ const ProfileScreen = () => {
   const { session } = useAppSelector((s) => s.auth);
   const { data } = useAppSelector((s) => s.profile);
   const { isDark, followSystem, colors } = useTheme();
+  const [avatarImageUri, setAvatarImageUri] = useState<string | null>(null);
+
+  const unreadCount = useAppSelector(selectUnreadCount);
 
   useEffect(() => {
     if (!session?.user.id) return;
     if (!data) dispatch(fetchProfile());
+    console.log("Profile data:", data);
   }, [dispatch, session?.user.id, data]);
+
+  useEffect(() => {
+    let active = true;
+
+    const resolveAvatarUrl = async () => {
+      const raw = data?.avatar_url?.trim();
+      if (!raw) {
+        if (active) setAvatarImageUri(null);
+        return;
+      }
+
+      let filePath: string | null = null;
+
+      if (raw.startsWith("http")) {
+        const marker = "/storage/v1/s3/";
+        const idx = raw.indexOf(marker);
+        if (idx >= 0) {
+          const tail = raw.slice(idx + marker.length);
+          filePath = tail.startsWith("avatars/") ? tail.slice(8) : tail;
+        }
+      } else {
+        filePath = raw.startsWith("avatars/") ? raw.slice(8) : raw;
+      }
+
+      if (!filePath) {
+        if (active) setAvatarImageUri(raw);
+        return;
+      }
+
+      const { data: signed, error } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(filePath, 60 * 60);
+
+      if (error) {
+        console.log("[profile] createSignedUrl failed", error.message);
+        if (active) setAvatarImageUri(raw);
+        return;
+      }
+
+      if (active) {
+        setAvatarImageUri(signed.signedUrl);
+      }
+    };
+
+    void resolveAvatarUrl();
+
+    return () => {
+      active = false;
+    };
+  }, [data?.avatar_url]);
 
   const handleLogout = () => {
     dispatch(signOut());
@@ -73,6 +129,12 @@ const ProfileScreen = () => {
       section: "Notifications",
       menuItems: [
         {
+          id: "in-app-notifications",
+          title: "In-App Notifications",
+          description: "Manage what notifications you receive in the app.",
+          onPress: () => router.push("/(notifications)"),
+        },
+        {
           id: "notification-settings",
           title: "Notification Settings",
           description: "Manage workout, hydration, and reminder notifications.",
@@ -94,12 +156,6 @@ const ProfileScreen = () => {
     {
       section: "App Preferences",
       menuItems: [
-        {
-          id: "units",
-          title: "Units & Measurements",
-          description: "Choose between metric or imperial units.",
-          onPress: () => router.push("/(profile)/units"),
-        },
         {
           id: "theme",
           title: "Dark Mode",
@@ -172,7 +228,9 @@ const ProfileScreen = () => {
       <View className="px-4 mb-6 items-center justify-center">
         <View className="relative">
           <Avatar className="w-24 h-24">
-            <AvatarImage source={{ uri: data?.avatar_url ?? undefined }} />
+            <AvatarImage
+              source={avatarImageUri ? { uri: avatarImageUri } : undefined}
+            />
             <AvatarFallback className="bg-gray-200">
               <Text
                 className="text-2xl font-dmsans"

@@ -1,8 +1,10 @@
 import { supabase } from "@/lib/supabase";
+import { store } from "@/store";
 import Constants from "expo-constants";
 import { NativeModulesProxy } from "expo-modules-core";
 import type { Router } from "expo-router";
 import { Platform } from "react-native";
+import { enqueueInAppNotification } from "../store/slices/notificationSlice";
 
 type NotificationsModule = typeof import("expo-notifications");
 type NotificationPermissionStatus = "granted" | "denied" | "undetermined";
@@ -281,6 +283,26 @@ export const setupNotificationListeners = (router: Router): (() => void) => {
     receivedSubscription = notifications.addNotificationReceivedListener(
       (notification: unknown) => {
         console.log("[notifications] notification received", notification);
+
+        const maybeNotification = notification as {
+          request?: {
+            content?: { title?: unknown; body?: unknown; data?: unknown };
+          };
+        };
+        const content = maybeNotification.request?.content;
+        const title = typeof content?.title === "string" ? content.title : "";
+        const body = typeof content?.body === "string" ? content.body : "";
+        const rawData = content?.data;
+        const data: Record<string, string> | undefined =
+          typeof rawData === "object" && rawData !== null
+            ? Object.fromEntries(
+                Object.entries(rawData as Record<string, unknown>).flatMap(
+                  ([k, v]) => (typeof v === "string" ? [[k, v]] : []),
+                ),
+              )
+            : undefined;
+
+        store.dispatch(enqueueInAppNotification({ title, body, data }));
       },
     );
 

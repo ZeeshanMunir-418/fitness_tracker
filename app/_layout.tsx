@@ -1,6 +1,6 @@
-// ⚠️ MUST be first import — TaskManager.defineTask runs at module load time
 import "@/lib/tasks/stepCounterTask";
 
+import InAppNotificationBanner from "@/components/InAppNotificationBanner";
 import { useNotifications } from "@/lib/hooks/useNotifications";
 import { supabase } from "@/lib/supabase";
 import { registerStepCounterTask } from "@/lib/tasks/stepCounterTask";
@@ -10,6 +10,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { getSession, setSession } from "@/store/slices/authSlice";
 import { loadTheme } from "@/store/slices/themeSlice";
 import { DMSans_400Regular, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -22,9 +23,12 @@ import "../globals.css";
 const onboardingCacheKey = (userId: string) =>
   `apex_onboarding_completed_${userId}`;
 
-const getCachedOnboardingCompleted = (userId: string) => {
+// All three helpers are async — always await them.
+const getCachedOnboardingCompleted = async (
+  userId: string,
+): Promise<boolean | null> => {
   try {
-    const raw = globalThis.localStorage?.getItem(onboardingCacheKey(userId));
+    const raw = await AsyncStorage.getItem(onboardingCacheKey(userId));
     if (raw === "true") return true;
     if (raw === "false") return false;
     return null;
@@ -33,10 +37,19 @@ const getCachedOnboardingCompleted = (userId: string) => {
   }
 };
 
-const setCachedOnboardingCompleted = (userId: string, value: boolean) => {
+const setCachedOnboardingCompleted = async (
+  userId: string,
+  value: boolean,
+): Promise<void> => {
   try {
-    globalThis.localStorage?.setItem(onboardingCacheKey(userId), String(value));
+    await AsyncStorage.setItem(onboardingCacheKey(userId), String(value));
   } catch {}
+};
+
+// Call this from step-8 after onboarding completes so the guard
+// never hits Supabase again for this user.
+export const warmOnboardingCache = async (userId: string): Promise<void> => {
+  await setCachedOnboardingCompleted(userId, true);
 };
 
 export const unstable_settings = {
@@ -50,9 +63,8 @@ function AppNavigator() {
   const { session, initialized } = useAppSelector((s) => s.auth);
   const { isDark, colors } = useTheme();
   const [isOfflineAlertVisible, setIsOfflineAlertVisible] = useState(false);
-  const [isMounted, setIsMounted] = useState(false); // ✅ fix 1: mount guard
+  const [isMounted, setIsMounted] = useState(false);
 
-  // ✅ Mark mounted after first render so navigation is safe
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -87,12 +99,10 @@ function AppNavigator() {
 
   useNotifications();
 
-  // ── Register background step counter ──────────────────────────────────────
   useEffect(() => {
     registerStepCounterTask();
   }, []);
 
-  // ── Connectivity polling ───────────────────────────────────────────────────
   useEffect(() => {
     let isActive = true;
 
@@ -109,7 +119,6 @@ function AppNavigator() {
     };
   }, [checkInternetConnection]);
 
-  // ── Auth + theme bootstrap ─────────────────────────────────────────────────
   useEffect(() => {
     dispatch(loadTheme());
     dispatch(getSession());
@@ -131,7 +140,7 @@ function AppNavigator() {
   // ── Navigation guard ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!initialized) return;
-    if (!isMounted) return; // ✅ wait for layout to mount before navigating
+    if (!isMounted) return;
 
     const rootSegment = segments[0] as string | undefined;
     const inAuthGroup = rootSegment === "(auth)";
@@ -140,24 +149,41 @@ function AppNavigator() {
     const inWorkouts = rootSegment === "workouts";
     const inProfile = rootSegment === "(profile)";
     const inNotifications = rootSegment === "(notifications)";
+    const inAuthCallback = rootSegment === "auth";
 
     const inProtectedArea =
       inTabsGroup || inWorkouts || inProfile || inNotifications;
 
-    // ── Not logged in ──────────────────────────────────────────────────────
+    // ── Not logged in ────────────────────────────────────────────────────────
     if (!session) {
-      if (inAuthGroup || rootSegment === undefined || rootSegment === "index") {
+      if (
+        inAuthGroup ||
+        inAuthCallback ||
+        rootSegment === undefined ||
+        rootSegment === "index"
+      ) {
         return;
       }
       router.replace("/");
       return;
     }
 
-    // ── Logged in ──────────────────────────────────────────────────────────
+    // ── Logged in ────────────────────────────────────────────────────────────
     let isEffectActive = true;
 
     const checkOnboarding = async () => {
-      const cached = getCachedOnboardingCompleted(session.user.id);
+      // ✅ Already in a protected route — never redirect backwards.
+      // This is the critical guard that prevents the post-onboarding flash:
+      // when resetOnboarding() fires 500ms after router.replace("/(tabs)"),
+      // segments[0] is already "(tabs)" so we bail out immediately here.
+      if (inProtectedArea) return;
+
+      // ✅ Await the async cache read — without await, cached is a Promise
+      // object which is never === true/false/null, causing a Supabase fetch
+      // on every single guard invocation and breaking cache entirely.
+      const cached = await getCachedOnboardingCompleted(session.user.id);
+
+      if (!isEffectActive) return;
 
       if (cached === false) {
         if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
@@ -165,12 +191,12 @@ function AppNavigator() {
       }
 
       if (cached === true) {
-        if (!inProtectedArea && !inOnboardingGroup) {
-          router.replace("/(tabs)");
-        }
+        // Cache says done — go to tabs if not already heading there
+        if (!inOnboardingGroup) router.replace("/(tabs)");
         return;
       }
 
+      // ── Cache miss: ask Supabase (only happens once per install) ───────────
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("onboarding_completed")
@@ -180,14 +206,15 @@ function AppNavigator() {
       if (!isEffectActive) return;
 
       if (error || !profile?.onboarding_completed) {
-        setCachedOnboardingCompleted(session.user.id, false);
+        await setCachedOnboardingCompleted(session.user.id, false);
         if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
         return;
       }
 
-      setCachedOnboardingCompleted(session.user.id, true);
+      // Warm the cache so we never hit Supabase again
+      await setCachedOnboardingCompleted(session.user.id, true);
 
-      if (!inProtectedArea && !inOnboardingGroup) {
+      if (!inOnboardingGroup) {
         router.replace("/(tabs)");
       }
     };
@@ -204,6 +231,7 @@ function AppNavigator() {
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         <Stack.Screen name="(notifications)" options={{ headerShown: false }} />
         <Stack.Screen name="(profile)" options={{ headerShown: false }} />
@@ -211,7 +239,6 @@ function AppNavigator() {
         <Stack.Screen name="workouts" options={{ headerShown: false }} />
       </Stack>
 
-      {/* ✅ fix 2: offline modal respects dark mode colors */}
       <Modal
         visible={isOfflineAlertVisible}
         transparent
@@ -221,8 +248,6 @@ function AppNavigator() {
         <View
           style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
           className="px-6"
-          // semi-transparent overlay always dark regardless of theme
-          // use a wrapping view for the overlay
         >
           <View
             style={{
@@ -286,6 +311,7 @@ function AppNavigator() {
       </Modal>
 
       <StatusBar style={isDark ? "light" : "dark"} />
+      <InAppNotificationBanner />
     </>
   );
 }

@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -175,9 +174,7 @@ const LoginScreen = () => {
                       />
                     }
                     rightIcon={
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                      <Pressable
                         className="mt-0 h-auto w-auto border-0 p-0"
                         onPress={() => setShowPassword((p) => !p)}
                       >
@@ -194,7 +191,7 @@ const LoginScreen = () => {
                             strokeWidth={2}
                           />
                         )}
-                      </Button>
+                      </Pressable>
                     }
                   />
                 )}
@@ -210,17 +207,16 @@ const LoginScreen = () => {
             </View>
 
             {/* Forgot Password */}
-            <Button
-              variant="ghost"
-              className="mt-0 self-end border-0 px-0 py-0"
-            >
-              <Text
-                style={{ color: colors.text }}
-                className="font-dmsans-bold text-sm"
-              >
-                Forgot password?
-              </Text>
-            </Button>
+            <Link href="/(auth)/forgot-password" asChild>
+              <Pressable className="mt-0 self-end border-0 px-0 py-0">
+                <Text
+                  style={{ color: colors.text }}
+                  className="font-dmsans-bold text-sm"
+                >
+                  Forgot password?
+                </Text>
+              </Pressable>
+            </Link>
 
             {/* Auth Error */}
             {authError && (

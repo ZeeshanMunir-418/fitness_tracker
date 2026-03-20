@@ -27,18 +27,25 @@ export const searchFood = createAsyncThunk(
   "nutrition/searchFood",
   async (query: string, { rejectWithValue }) => {
     try {
-      const res = await axios.get(
-        process.env.EXPO_PUBLIC_SUPABASE_SEARCH_FN_URL!,
+      const res = await axios.post(
+        "https://riegdzgvrijgvfsxtcjp.supabase.co/functions/v1/hyper-service",
+        { query }, // ✅ JSON body: { "query": "high protein" }
         {
-          params: { q: query },
           headers: {
+            "Content-Type": "application/json", // ✅ not text/plain
             Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            apikey: "sb_publishable_JMBG2ic4oVd3UYhNQAxTcw_LwGNJ0WS",
           },
         },
       );
+      console.log("API response:", res.data);
       return res.data.results as FoodItem[];
     } catch (err: any) {
-      return rejectWithValue(err.message);
+      const message = axios.isAxiosError(err)
+        ? err.response?.data?.error || err.message
+        : err.message;
+      console.log("Error searching food:", err);
+      return rejectWithValue(message);
     }
   },
 );

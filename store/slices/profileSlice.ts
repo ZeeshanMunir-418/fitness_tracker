@@ -124,6 +124,11 @@ export const fetchProfile = createAsyncThunk<Profile | null, void, ThunkConfig>(
 /**
  * Updates profile fields for the currently authenticated user.
  */
+/**
+ * Updates profile fields for the currently authenticated user.
+ * Strips read-only, computed, and identity fields before sending
+ * to Supabase to prevent accidental column overflows or conflicts.
+ */
 export const updateProfile = createAsyncThunk<
   Profile,
   UpdateProfileInput,
@@ -138,10 +143,27 @@ export const updateProfile = createAsyncThunk<
       throw new Error("User is not authenticated.");
     }
 
+    // ✅ Strip fields that must never be sent in an update:
+    //   - id, created_at        → identity / immutable
+    //   - bmi, bmr, daily_calorie_target → server-computed, sending them
+    //     risks NUMERIC(4,2) overflow (e.g. height=175 overflows precision 4)
+    //   - expo_push_token       → managed separately by the push-token flow
+    //   - onboarding_completed  → managed separately by the onboarding flow
+    const {
+      id,
+      created_at,
+      bmi,
+      bmr,
+      daily_calorie_target,
+      expo_push_token,
+      onboarding_completed,
+      ...safePayload
+    } = payload as Profile;
+
     const { data, error } = await supabase
       .from("profiles")
       .update({
-        ...payload,
+        ...safePayload,
         updated_at: new Date().toISOString(),
       })
       .eq("id", userId)
@@ -154,9 +176,7 @@ export const updateProfile = createAsyncThunk<
     }
 
     const profile = data as Profile;
-    console.log("[profile] updateProfile end", {
-      id: profile.id,
-    });
+    console.log("[profile] updateProfile end", { id: profile.id });
     return profile;
   } catch (error) {
     console.error("[profile] updateProfile failed", error);

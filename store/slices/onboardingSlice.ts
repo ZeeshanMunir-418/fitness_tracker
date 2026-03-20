@@ -66,6 +66,9 @@ interface OnboardingState {
   currentStep: number;
   loading: boolean;
   error: string | null;
+  // 0 = idle, 1 = verifying session, 2 = uploading avatar,
+  // 3 = saving profile, 4 = generating plans, 5 = done
+  progressStep: number;
   data: OnboardingData;
 }
 
@@ -73,6 +76,7 @@ const initialState: OnboardingState = {
   currentStep: 1,
   loading: false,
   error: null,
+  progressStep: 0,
   data: {
     avatarUri: null,
     fullName: "",
@@ -105,9 +109,12 @@ export const saveOnboardingProfile = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >(
   "onboarding/saveOnboardingProfile",
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { getState, dispatch, rejectWithValue }) => {
     const state = getState();
     const { data } = state.onboarding;
+
+    // ── Phase 1: verify / refresh session ──────────────────────────────────
+    dispatch(setProgressStep(1));
 
     let userId = state.auth.user?.id;
     let accessToken: string | null = null;
@@ -171,7 +178,9 @@ export const saveOnboardingProfile = createAsyncThunk<
       updated_at: new Date().toISOString(),
     };
 
+    // ── Phase 2: upload avatar (only if one was chosen) ────────────────────
     if (data.avatarUri) {
+      dispatch(setProgressStep(2));
       try {
         const fileExtMatch = data.avatarUri.split("?")[0]?.split(".").pop();
         const fileExt = fileExtMatch ? fileExtMatch.toLowerCase() : "jpg";
@@ -184,10 +193,7 @@ export const saveOnboardingProfile = createAsyncThunk<
 
         const { error: uploadError } = await supabase.storage
           .from("avatars")
-          .upload(filePath, avatarBytes, {
-            contentType,
-            upsert: true,
-          });
+          .upload(filePath, avatarBytes, { contentType, upsert: true });
 
         if (uploadError) {
           console.error("[onboarding] avatar upload failed", uploadError);
@@ -196,8 +202,7 @@ export const saveOnboardingProfile = createAsyncThunk<
 
         const bucketUrl = process.env.EXPO_PUBLIC_SUPABASE_BUCKET_URL;
         if (bucketUrl) {
-          const publicUrl = `${bucketUrl}/avatars/${filePath}`;
-          payload.avatar_url = publicUrl;
+          payload.avatar_url = `${bucketUrl}/avatars/${filePath}`;
         }
       } catch (error) {
         console.error("[onboarding] avatar upload error", error);
@@ -207,28 +212,28 @@ export const saveOnboardingProfile = createAsyncThunk<
       }
     }
 
-    const { error: dbError } = await supabase.from("profiles").upsert(payload, {
-      onConflict: "id",
-    });
+    // ── Phase 3: upsert profile row ────────────────────────────────────────
+    dispatch(setProgressStep(3));
+
+    const { error: dbError } = await supabase
+      .from("profiles")
+      .upsert(payload, { onConflict: "id" });
 
     if (dbError) {
       console.error("[onboarding] profile upsert failed", dbError);
       return rejectWithValue(dbError.message);
     }
 
-    // Remove the entire axios import and the axios.post block, replace with:
-    const fnName = "personalized_workout_and_meal_plan";
+    // ── Phase 4: invoke AI edge function ───────────────────────────────────
+    dispatch(setProgressStep(4));
 
     try {
-      const { data: fnData, error: fnError } = await supabase.functions.invoke(
-        fnName,
-        {
-          body: payload,
-        },
+      const { error: fnError } = await supabase.functions.invoke(
+        "personalized_workout_and_meal_plan",
+        { body: payload },
       );
 
       if (fnError) {
-        // Extract the real error message from the response body
         let message = fnError.message ?? "Failed to generate plan.";
         try {
           const body = await (fnError as any).context?.json();
@@ -248,6 +253,9 @@ export const saveOnboardingProfile = createAsyncThunk<
         error instanceof Error ? error.message : "Something went wrong";
       return rejectWithValue(message);
     }
+
+    // ── Phase 5: all done ──────────────────────────────────────────────────
+    dispatch(setProgressStep(5));
   },
 );
 
@@ -267,24 +275,35 @@ const onboardingSlice = createSlice({
     prevStep: (state) => {
       state.currentStep = Math.max(1, state.currentStep - 1);
     },
-    resetOnboarding: () => initialState,
+    setProgressStep: (state, action: PayloadAction<number>) => {
+      state.progressStep = action.payload;
+    },
+    resetOnboarding: () => initialState, // resets progressStep to 0 too
   },
   extraReducers: (builder) => {
     builder.addCase(saveOnboardingProfile.pending, (state) => {
       state.loading = true;
       state.error = null;
+      state.progressStep = 0;
     });
     builder.addCase(saveOnboardingProfile.fulfilled, (state) => {
       state.loading = false;
       state.error = null;
+      // progressStep stays at 5 so the "Done" frame shows before unmount
     });
     builder.addCase(saveOnboardingProfile.rejected, (state, action) => {
       state.loading = false;
+      state.progressStep = 0;
       state.error = action.payload ?? "Failed to save onboarding profile.";
     });
   },
 });
 
-export const { updateOnboardingData, nextStep, prevStep, resetOnboarding } =
-  onboardingSlice.actions;
+export const {
+  updateOnboardingData,
+  nextStep,
+  prevStep,
+  setProgressStep,
+  resetOnboarding,
+} = onboardingSlice.actions;
 export default onboardingSlice.reducer;

@@ -4,9 +4,13 @@ import {
   saveExpoPushTokenToSupabase,
   setupNotificationListeners,
 } from "@/lib/notifications";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import {
+  setExpoPushToken as setExpoPushTokenAction,
+  setPermissionGranted as setPermissionGrantedAction,
+} from "../../store/slices/notificationSlice";
 
 export interface UseNotificationsResult {
   permissionGranted: boolean;
@@ -18,7 +22,8 @@ export interface UseNotificationsResult {
  */
 export const useNotifications = (): UseNotificationsResult => {
   const router = useRouter();
-  const userId = useAppSelector((state) => state.auth.user?.id ?? null);
+  const dispatch = useAppDispatch();
+  const userId = useAppSelector((state) => state?.auth.user?.id ?? null);
 
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
@@ -34,6 +39,7 @@ export const useNotifications = (): UseNotificationsResult => {
       }
 
       setPermissionGranted(granted);
+      dispatch(setPermissionGrantedAction(granted));
 
       if (!granted) {
         return;
@@ -46,6 +52,7 @@ export const useNotifications = (): UseNotificationsResult => {
       }
 
       setExpoPushToken(token);
+      dispatch(setExpoPushTokenAction(token));
 
       if (token && userId) {
         await saveExpoPushTokenToSupabase(userId, token);
@@ -60,7 +67,7 @@ export const useNotifications = (): UseNotificationsResult => {
       isMounted = false;
       cleanupListeners();
     };
-  }, [router, userId]);
+  }, [dispatch, router, userId]);
 
   return {
     permissionGranted,
