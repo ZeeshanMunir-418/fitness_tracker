@@ -1,9 +1,17 @@
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppSelector } from "@/store/hooks";
+import { selectUnreadCount } from "@/store/slices/notificationSlice";
 import { Tabs, useRouter } from "expo-router";
-import { Activity, Dumbbell, Home, User, Utensils } from "lucide-react-native";
+import {
+  Activity,
+  Bell,
+  Dumbbell,
+  Home,
+  User,
+  Utensils,
+} from "lucide-react-native";
 import React, { useEffect } from "react";
-import { View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconProps = {
@@ -44,65 +52,67 @@ const TabsLayout = () => {
   };
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.text,
-        tabBarInactiveTintColor: colors.textFaint,
-        tabBarLabel: () => null,
-        tabBarHideOnKeyboard: true,
-        tabBarStyle: {
-          backgroundColor: colors.inputBg,
-          borderTopWidth: 0,
-          elevation: 5,
-          height: 54,
-          width: "80%",
-          marginHorizontal: "10%",
-          paddingBottom: 10,
-          paddingTop: 8,
-          position: "absolute",
-          bottom: tabBarBottom,
-          borderRadius: 30,
-          shadowOpacity: isDark ? 0 : 0.08,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: (props) => renderTabIcon(Home, props),
+    <View style={{ flex: 1 }}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.text,
+          tabBarInactiveTintColor: colors.textFaint,
+          tabBarLabel: () => null,
+          tabBarHideOnKeyboard: true,
+          tabBarStyle: {
+            backgroundColor: colors.inputBg,
+            borderTopWidth: 0,
+            elevation: 5,
+            height: 54,
+            width: "80%",
+            marginHorizontal: "10%",
+            paddingBottom: 10,
+            paddingTop: 8,
+            position: "absolute",
+            bottom: tabBarBottom,
+            borderRadius: 30,
+            shadowOpacity: isDark ? 0 : 0.08,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="nutrition"
-        options={{
-          title: "Nutrition",
-          tabBarIcon: (props) => renderTabIcon(Utensils, props),
-        }}
-      />
-      <Tabs.Screen
-        name="activity"
-        options={{
-          title: "Activity",
-          tabBarIcon: (props) => renderTabIcon(Activity, props),
-        }}
-      />
-      <Tabs.Screen
-        name="workouts"
-        options={{
-          title: "Workout",
-          tabBarIcon: (props) => renderTabIcon(Dumbbell, props),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: (props) => renderTabIcon(User, props),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: "Home",
+            tabBarIcon: (props) => renderTabIcon(Home, props),
+          }}
+        />
+        <Tabs.Screen
+          name="nutrition"
+          options={{
+            title: "Nutrition",
+            tabBarIcon: (props) => renderTabIcon(Utensils, props),
+          }}
+        />
+        <Tabs.Screen
+          name="activity"
+          options={{
+            title: "Activity",
+            tabBarIcon: (props) => renderTabIcon(Activity, props),
+          }}
+        />
+        <Tabs.Screen
+          name="workouts"
+          options={{
+            title: "Workout",
+            tabBarIcon: (props) => renderTabIcon(Dumbbell, props),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Profile",
+            tabBarIcon: (props) => renderTabIcon(User, props),
+          }}
+        />
+      </Tabs>
+    </View>
   );
 };
 

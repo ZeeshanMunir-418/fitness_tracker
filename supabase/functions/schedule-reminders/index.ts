@@ -1,17 +1,48 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-interface ReminderProfile {
-  id: string;
-  expo_push_token: string | null;
-  workout_reminders: boolean | null;
-  meal_reminders: boolean | null;
-  preferred_workout_time: "morning" | "afternoon" | "evening" | null;
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface SinglePayload {
+  token?: string;
+  userId?: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
 }
 
-type MealReminderType = "breakfast" | "lunch" | "dinner";
+interface BatchItem {
+  token: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}
 
-const corsHeaders: Record<string, string> = {
+interface BatchPayload {
+  batch: BatchItem[];
+}
+
+type RequestPayload = SinglePayload | BatchPayload;
+
+interface ExpoMessage {
+  to: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  sound: "default";
+  priority: "high";
+}
+
+interface ExpoTicket {
+  status: "ok" | "error";
+  id?: string;
+  message?: string;
+  details?: { error?: string };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
@@ -21,48 +52,45 @@ const corsHeaders: Record<string, string> = {
 const jsonResponse = (status: number, payload: unknown) =>
   new Response(JSON.stringify(payload), {
     status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-    },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-const shouldSendWorkoutReminder = (
-  preferredTime: ReminderProfile["preferred_workout_time"],
-  currentUtcHour: number,
-): boolean => {
-  if (!preferredTime) {
-    return false;
+const isValidExpoToken = (token: string): boolean =>
+  token.startsWith("ExponentPushToken[");
+
+// Expo recommends max 100 messages per batch request.
+const EXPO_BATCH_SIZE = 100;
+
+const chunkArray = <T>(arr: T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, i * size + size),
+  );
+
+/**
+ * Sends one batch of ≤100 Expo messages.
+ * Returns the array of tickets from Expo.
+ */
+const sendExpoBatch = async (
+  messages: ExpoMessage[],
+): Promise<ExpoTicket[]> => {
+  const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(messages),
+  });
+
+  const json = await response.json();
+
+  if (!response.ok) {
+    console.error("[pushFn] Expo batch API failure", json);
+    throw new Error(`Expo API error: ${JSON.stringify(json)}`);
   }
 
-  if (preferredTime === "morning") {
-    return currentUtcHour >= 6 && currentUtcHour <= 8;
-  }
-
-  if (preferredTime === "afternoon") {
-    return currentUtcHour >= 12 && currentUtcHour <= 14;
-  }
-
-  return currentUtcHour >= 17 && currentUtcHour <= 19;
+  // Expo wraps batch responses in { data: ExpoTicket[] }
+  return (json.data ?? [json]) as ExpoTicket[];
 };
 
-const getMealTypeForHour = (
-  currentUtcHour: number,
-): MealReminderType | null => {
-  if (currentUtcHour === 7) {
-    return "breakfast";
-  }
-
-  if (currentUtcHour === 12) {
-    return "lunch";
-  }
-
-  if (currentUtcHour === 18) {
-    return "dinner";
-  }
-
-  return null;
-};
+// ── Handler ───────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -73,128 +101,170 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
 
   if (!serviceRoleKey || !supabaseUrl) {
-    console.error(
-      "[reminders] missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
-    );
+    console.error("[pushFn] missing env vars");
     return jsonResponse(500, { error: "Server configuration is incomplete." });
   }
 
   const authHeader = req.headers.get("Authorization");
-  const expectedAuthHeader = `Bearer ${serviceRoleKey}`;
-
-  if (!authHeader || authHeader !== expectedAuthHeader) {
-    console.error("[reminders] unauthorized request");
+  if (!authHeader || authHeader !== `Bearer ${serviceRoleKey}`) {
+    console.error("[pushFn] unauthorized request");
     return jsonResponse(401, { error: "Unauthorized" });
   }
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-  const now = new Date();
-  const currentUtcHour = now.getUTCHours();
-  const mealType = getMealTypeForHour(currentUtcHour);
 
-  console.log("[reminders] schedule run start", {
-    currentUtcHour,
-    mealType,
-    timestamp: now.toISOString(),
-  });
-
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id, expo_push_token, workout_reminders, meal_reminders, preferred_workout_time",
-    )
-    .or("workout_reminders.eq.true,meal_reminders.eq.true")
-    .not("expo_push_token", "is", null)
-    .eq("onboarding_completed", true);
-
-  if (error) {
-    console.error("[reminders] failed to fetch profiles", error);
-    return jsonResponse(500, { error: error.message });
+  let payload: RequestPayload;
+  try {
+    payload = await req.json();
+  } catch {
+    return jsonResponse(400, { error: "Invalid JSON body." });
   }
 
-  const profiles = (data ?? []) as ReminderProfile[];
+  // ── BATCH mode ─────────────────────────────────────────────────────────────
+  // Called by the reminders function with { batch: BatchItem[] }
+  if ("batch" in payload) {
+    const { batch } = payload;
 
-  let sentCount = 0;
-
-  const sendToProfile = async (
-    token: string,
-    title: string,
-    body: string,
-    extraData: Record<string, string>,
-  ) => {
-    const response = await fetch(
-      `${supabaseUrl}/functions/v1/send-push-notification`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceRoleKey}`,
-        },
-        body: JSON.stringify({
-          token,
-          title,
-          body,
-          data: extraData,
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const responseText = await response.text();
-      console.error("[reminders] failed to send push", {
-        status: response.status,
-        responseText,
-      });
-      return;
+    if (!Array.isArray(batch) || batch.length === 0) {
+      return jsonResponse(400, { error: "batch must be a non-empty array." });
     }
 
-    sentCount += 1;
+    // Validate and build Expo messages, skipping bad tokens
+    const messages: ExpoMessage[] = [];
+    const skipped: string[] = [];
+
+    for (const item of batch) {
+      if (!item.token || !isValidExpoToken(item.token)) {
+        skipped.push(item.token ?? "(missing)");
+        continue;
+      }
+      if (!item.title || !item.body) {
+        skipped.push(item.token);
+        continue;
+      }
+      messages.push({
+        to: item.token,
+        title: item.title,
+        body: item.body,
+        data: item.data ?? {},
+        sound: "default",
+        priority: "high",
+      });
+    }
+
+    if (messages.length === 0) {
+      return jsonResponse(400, {
+        error: "No valid messages in batch after validation.",
+        skipped,
+      });
+    }
+
+    // Split into ≤100 chunks and send concurrently
+    const chunks = chunkArray(messages, EXPO_BATCH_SIZE);
+    const allTickets: ExpoTicket[] = [];
+
+    try {
+      const chunkResults = await Promise.all(chunks.map(sendExpoBatch));
+      chunkResults.forEach((tickets) => allTickets.push(...tickets));
+    } catch (err) {
+      console.error("[pushFn] batch send failed", err);
+      return jsonResponse(502, {
+        error: "Expo push API returned an error.",
+        details: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const successCount = allTickets.filter((t) => t.status === "ok").length;
+    const failedTickets = allTickets.filter((t) => t.status === "error");
+
+    console.log("[pushFn] batch complete", {
+      total: messages.length,
+      sent: successCount,
+      failed: failedTickets.length,
+      skipped: skipped.length,
+    });
+
+    return jsonResponse(200, {
+      success: true,
+      total: messages.length,
+      sent: successCount,
+      failed: failedTickets.length,
+      skipped: skipped.length,
+      failedTickets, // surface Expo-level errors (DeviceNotRegistered etc.)
+    });
+  }
+
+  // ── SINGLE mode ────────────────────────────────────────────────────────────
+  // Original behaviour — single { token?, userId?, title, body, data? }
+
+  if (!payload.title || !payload.body) {
+    return jsonResponse(400, { error: "Both title and body are required." });
+  }
+
+  let resolvedToken = payload.token;
+
+  if (!resolvedToken && payload.userId) {
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("expo_push_token")
+      .eq("id", payload.userId)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("[pushFn] failed to fetch user token", profileError);
+      return jsonResponse(500, { error: profileError.message });
+    }
+
+    if (!profile) {
+      return jsonResponse(404, { error: "User profile not found." });
+    }
+
+    resolvedToken = profile.expo_push_token ?? undefined;
+  }
+
+  if (!resolvedToken) {
+    return jsonResponse(400, {
+      error:
+        "Missing push token. Provide token or a userId with a stored expo_push_token.",
+    });
+  }
+
+  if (!isValidExpoToken(resolvedToken)) {
+    return jsonResponse(400, {
+      error: "Invalid Expo push token format.",
+    });
+  }
+
+  const message: ExpoMessage = {
+    to: resolvedToken,
+    title: payload.title,
+    body: payload.body,
+    data: payload.data ?? {},
+    sound: "default",
+    priority: "high",
   };
 
-  for (const profile of profiles) {
-    const token = profile.expo_push_token;
+  try {
+    const [ticket] = await sendExpoBatch([message]);
 
-    if (!token) {
-      continue;
+    if (ticket.status === "error") {
+      console.error("[pushFn] Expo ticket error", ticket);
+      return jsonResponse(502, {
+        error: "Expo rejected the notification.",
+        details: ticket,
+      });
     }
 
-    if (
-      profile.workout_reminders &&
-      shouldSendWorkoutReminder(profile.preferred_workout_time, currentUtcHour)
-    ) {
-      await sendToProfile(
-        token,
-        "Time to Work Out 💪",
-        "Your workout is ready. Let's crush it today!",
-        {
-          screen: "/workout",
-          type: "workout_reminder",
-        },
-      );
-    }
+    console.log("[pushFn] notification sent", {
+      token: resolvedToken,
+      title: payload.title,
+    });
 
-    if (profile.meal_reminders && mealType) {
-      await sendToProfile(
-        token,
-        "Meal Reminder 🥗",
-        `Don't forget your ${mealType}!`,
-        {
-          screen: "/nutrition",
-          type: "meal_reminder",
-        },
-      );
-    }
+    return jsonResponse(200, { success: true, ticket });
+  } catch (err) {
+    console.error("[pushFn] failed to call Expo push API", err);
+    return jsonResponse(500, {
+      error: "Failed to send notification via Expo push API.",
+    });
   }
-
-  console.log("[reminders] schedule run end", {
-    profilesCount: profiles.length,
-    sentCount,
-  });
-
-  return jsonResponse(200, {
-    success: true,
-    profilesProcessed: profiles.length,
-    notificationsSent: sentCount,
-    currentUtcHour,
-  });
 });

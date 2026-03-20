@@ -31,6 +31,7 @@ interface FoodItem {
   fatGrams: number;
   proteinGrams: number;
   carbsGrams: number;
+  servingSize: string;
 }
 
 interface MealCardProps {
@@ -68,7 +69,7 @@ export const MealCard = ({
   foodItems,
   totalCalories,
 }: MealCardProps) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const MealIcon = MEAL_ICONS[mealKey] ?? UtensilsCrossed;
   const hasItems = foodItems.length > 0;
 
@@ -81,50 +82,40 @@ export const MealCard = ({
 
   return (
     <View
-      style={{
-        borderWidth: 2,
-        borderRadius: 20,
-        overflow: "hidden",
-        borderColor: colors.border,
-        backgroundColor: colors.card,
-        marginBottom: 4,
-      }}
+      className={`border-2 rounded-[20px] overflow-hidden mb-1 ${
+        isDark ? "border-white/20 bg-neutral-900" : "border-black/10 bg-white"
+      }`}
     >
-      {/* Header row */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <Pressable
         onPress={handleToggle}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-        }}
+        className="flex-row items-center justify-between px-4 py-3"
       >
         {/* Left: icon + name */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <View className="flex-row items-center gap-3">
           <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 999,
-              backgroundColor: colors.text,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className={`w-10 h-10 rounded-full items-center justify-center ${
+              isDark ? "bg-white" : "bg-black"
+            }`}
           >
-            <MealIcon size={18} color={colors.background} strokeWidth={1.8} />
+            <MealIcon
+              size={18}
+              color={isDark ? "#000" : "#fff"}
+              strokeWidth={1.8}
+            />
           </View>
           <View>
             <Text
-              style={{ color: colors.text, fontSize: 15 }}
-              className="font-dmsans-bold uppercase tracking-wide"
+              className={`font-dmsans-bold text-base uppercase tracking-wide ${
+                isDark ? "text-white" : "text-black"
+              }`}
             >
               {meal}
             </Text>
             <Text
-              style={{ color: colors.textFaint, fontSize: 11, marginTop: 2 }}
-              className="font-dmsans"
+              className={`font-dmsans text-xs mt-0.5 ${
+                isDark ? "text-white/40" : "text-black/40"
+              }`}
             >
               {hasItems
                 ? `${foodItems.length} item${foodItems.length > 1 ? "s" : ""}`
@@ -134,134 +125,151 @@ export const MealCard = ({
         </View>
 
         {/* Right: calories + chevron */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View style={{ alignItems: "flex-end" }}>
+        <View className="flex-row items-center gap-2">
+          <View className="items-end">
             <Text
-              style={{ color: colors.text, fontSize: 22, lineHeight: 24 }}
-              className="font-dmsans-bold"
+              className={`font-dmsans-bold text-2xl leading-none ${
+                isDark ? "text-white" : "text-black"
+              }`}
             >
               {totalCalories}
             </Text>
             <Text
-              style={{
-                color: colors.textFaint,
-                fontSize: 10,
-                letterSpacing: 1.5,
-                marginTop: 2,
-              }}
-              className="font-dmsans uppercase"
+              className={`font-dmsans text-[10px] uppercase tracking-widest mt-0.5 ${
+                isDark ? "text-white/40" : "text-black/40"
+              }`}
             >
               kcal
             </Text>
           </View>
           {openDropDown ? (
-            <ChevronUp size={20} color={colors.textMuted} strokeWidth={1.5} />
+            <ChevronUp
+              size={20}
+              color={isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)"}
+              strokeWidth={1.5}
+            />
           ) : (
-            <ChevronDown size={20} color={colors.textMuted} strokeWidth={1.5} />
+            <ChevronDown
+              size={20}
+              color={isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)"}
+              strokeWidth={1.5}
+            />
           )}
         </View>
       </Pressable>
 
-      {/* Expanded food items */}
+      {/* ── Expanded content ───────────────────────────────────────────────── */}
       {openDropDown && (
         <View
-          style={{
-            borderTopWidth: 2,
-            borderTopColor: colors.cardBorder,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            gap: 12,
-          }}
+          className={`border-t-2 px-4 pt-3 pb-4 gap-3 ${
+            isDark ? "border-white/10" : "border-black/8"
+          }`}
         >
           {hasItems ? (
             foodItems.map((item, index) => (
               <View key={index}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
+                {/* Food name + calories */}
+                <View className="flex-row items-start justify-between">
                   <Text
-                    style={{ color: colors.text, flex: 1, marginRight: 12 }}
-                    className="font-dmsans-bold text-sm"
+                    className={`font-dmsans-bold text-sm flex-1 mr-3 leading-5 ${
+                      isDark ? "text-white" : "text-black"
+                    }`}
                   >
                     {item.foodName}
                   </Text>
                   <Text
-                    style={{ color: colors.text }}
-                    className="font-dmsans-bold text-lg"
+                    className={`font-dmsans-bold text-base leading-none ${
+                      isDark ? "text-white" : "text-black"
+                    }`}
                   >
                     {item.calories}
                     <Text
-                      style={{ color: colors.textFaint, fontSize: 11 }}
-                      className="font-dmsans"
+                      className={`font-dmsans text-xs ${
+                        isDark ? "text-white/40" : "text-black/40"
+                      }`}
                     >
                       {" "}
                       kcal
                     </Text>
                   </Text>
                 </View>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 16,
-                    marginTop: 4,
-                  }}
-                >
+
+                {/* Macro pills row */}
+                <View className="flex-row flex-wrap gap-x-3 gap-y-1 mt-1.5">
                   {[
-                    { label: "Protein", value: item.proteinGrams },
-                    { label: "Carbs", value: item.carbsGrams },
-                    { label: "Fat", value: item.fatGrams },
+                    {
+                      label: "P",
+                      value: `${item.proteinGrams}g`,
+                      full: "Protein",
+                    },
+                    { label: "C", value: `${item.carbsGrams}g`, full: "Carbs" },
+                    { label: "F", value: `${item.fatGrams}g`, full: "Fat" },
                   ].map((macro) => (
                     <View
                       key={macro.label}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 3,
-                      }}
+                      className="flex-row items-center gap-1"
                     >
                       <Text
-                        style={{ color: colors.textFaint, fontSize: 11 }}
-                        className="font-dmsans"
+                        className={`font-dmsans text-[11px] ${
+                          isDark ? "text-white/35" : "text-black/35"
+                        }`}
                       >
-                        {macro.label}
+                        {macro.full}
                       </Text>
                       <Text
-                        style={{ color: colors.textMuted, fontSize: 11 }}
-                        className="font-dmsans-bold"
+                        className={`font-dmsans-bold text-[11px] ${
+                          isDark ? "text-white/60" : "text-black/60"
+                        }`}
                       >
-                        {macro.value}g
+                        {macro.value}
                       </Text>
                     </View>
                   ))}
+
+                  {/* Serving size */}
+                  {item.servingSize ? (
+                    <View className="flex-row items-center gap-1">
+                      <Text
+                        className={`font-dmsans text-[11px] ${
+                          isDark ? "text-white/35" : "text-black/35"
+                        }`}
+                      >
+                        Serving
+                      </Text>
+                      <Text
+                        className={`font-dmsans-bold text-[11px] ${
+                          isDark ? "text-white/60" : "text-black/60"
+                        }`}
+                        numberOfLines={1}
+                      >
+                        {item.servingSize}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
+
+                {/* Divider between items */}
                 {index < foodItems.length - 1 && (
                   <View
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.cardBorder,
-                      marginTop: 10,
-                    }}
+                    className={`border-b mt-3 ${
+                      isDark ? "border-white/8" : "border-black/6"
+                    }`}
                   />
                 )}
               </View>
             ))
           ) : (
             /* Empty state */
-            <View
-              style={{
-                alignItems: "center",
-                paddingVertical: 16,
-                gap: 6,
-              }}
-            >
-              <MealIcon size={28} color={colors.textFaint} strokeWidth={1.2} />
+            <View className="items-center py-4 gap-1.5">
+              <MealIcon
+                size={28}
+                color={isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"}
+                strokeWidth={1.2}
+              />
               <Text
-                style={{ color: colors.textMuted, fontSize: 13 }}
-                className="font-dmsans"
+                className={`font-dmsans text-sm ${
+                  isDark ? "text-white/40" : "text-black/40"
+                }`}
               >
                 No {meal.toLowerCase()} logged yet
               </Text>

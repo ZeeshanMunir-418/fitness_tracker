@@ -1,18 +1,28 @@
-import { Button } from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-    clearResults,
-    FoodItem,
-    searchFood,
+  clearResults,
+  type FoodItem,
+  searchFood,
 } from "@/store/slices/nutritionSlice";
-import { X } from "lucide-react-native";
-import React, { useState } from "react";
-import { ActivityIndicator, Modal, ScrollView, Text, View } from "react-native";
+import { cn } from "@/utils/cn";
+import { CheckCircle2, Search, X } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Dimensions,
+  Keyboard,
+  KeyboardEvent,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snacks";
-
 const MEAL_KEYS: MealKey[] = ["breakfast", "lunch", "dinner", "snacks"];
 
 interface AddMealModalProps {
@@ -21,25 +31,61 @@ interface AddMealModalProps {
   onSave: (mealKey: MealKey, items: FoodItem[]) => void;
 }
 
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+
+// Fixed heights of the non-scrollable zones (handle + header + search + divider)
+const FIXED_ZONE_HEIGHT = 180;
+// Extra breathing room above keyboard
+const KEYBOARD_PADDING = 16;
+
 export const AddMealModal: React.FC<AddMealModalProps> = ({
   visible,
   onClose,
   onSave,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
   const dispatch = useAppDispatch();
   const searchResults = useAppSelector((s) => s.nutrition.searchResults);
-  const loading = useAppSelector((s) => s.nutrition.loading);
-  const error = useAppSelector((s) => s.nutrition.error);
+  const searchLoading = useAppSelector((s) => s.nutrition.loading);
+  const searchError = useAppSelector((s) => s.nutrition.error);
 
   const [selectedMeal, setSelectedMeal] = useState<MealKey>("breakfast");
   const [query, setQuery] = useState("");
   const [selectedItems, setSelectedItems] = useState<FoodItem[]>([]);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // ── Track keyboard height manually ────────────────────────────────────────
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const onShow = (e: KeyboardEvent) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    };
+    const onHide = () => {
+      setKeyboardHeight(0);
+    };
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // ── Derive scroll area height ──────────────────────────────────────────────
+  // Available height = screen - keyboard - fixed zone - padding
+  const availableHeight =
+    keyboardHeight > 0
+      ? SCREEN_HEIGHT - keyboardHeight - FIXED_ZONE_HEIGHT - KEYBOARD_PADDING
+      : SCREEN_HEIGHT * 0.45; // default ~45% of screen when keyboard closed
 
   const handleSearch = () => {
-    if (query.trim()) {
-      dispatch(searchFood(query.trim()));
-    }
+    if (query.trim()) dispatch(searchFood(query.trim()));
   };
 
   const handleAddItem = (item: FoodItem) => {
@@ -70,144 +116,267 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
       animationType="slide"
       transparent
       onRequestClose={handleClose}
+      statusBarTranslucent
     >
       <View className="flex-1 justify-end">
         {/* Backdrop */}
-        <Button
-          className="absolute inset-0 mt-0 border-0 bg-black/40 p-0"
-          variant="ghost"
+        <Pressable
+          className="absolute inset-0 bg-black/50"
           onPress={handleClose}
-        >
-          <View />
-        </Button>
+        />
 
-        {/* Sheet */}
+        {/* Sheet — positioned at bottom, moves up by keyboard height on Android */}
         <View
-          className="bg-white rounded-t-3xl border-t-2 border-x-2 border-black px-4 pt-5 pb-10 max-h-[92%]"
           style={{
-            backgroundColor: colors.background,
-            borderColor: colors.border,
+            marginBottom: Platform.OS === "android" ? keyboardHeight : 0,
           }}
+          className={cn(
+            "rounded-t-3xl border-t-2 border-x-2",
+            isDark ? "bg-black border-white/20" : "bg-white border-black/10",
+          )}
         >
           {/* Handle */}
-          <View
-            className="w-12 h-1 rounded-full bg-neutral-300 self-center mb-5"
-            style={{ backgroundColor: colors.borderMuted }}
-          />
+          <View className="items-center pt-3 pb-1">
+            <View
+              className={cn(
+                "w-10 h-1 rounded-full",
+                isDark ? "bg-white/20" : "bg-black/15",
+              )}
+            />
+          </View>
 
           {/* Header */}
-          <View className="flex-row items-center justify-between mb-5">
+          <View className="flex-row items-center justify-between px-4 pt-2 pb-3">
             <Text
-              className="text-2xl font-dmsans-bold uppercase tracking-tight"
-              style={{ color: colors.text }}
+              className={cn(
+                "font-dmsans-bold text-2xl uppercase tracking-tight",
+                isDark ? "text-white" : "text-black",
+              )}
             >
               Add Food
             </Text>
-            <Button
+            <Pressable
               onPress={handleClose}
-              className="mt-0 rounded-full p-1"
-              variant="outline"
-              size="icon"
+              className={cn(
+                "w-9 h-9 rounded-full border-2 items-center justify-center",
+                isDark ? "border-white/20" : "border-black/15",
+              )}
             >
-              <X size={20} color={colors.text} />
-            </Button>
+              <X
+                size={16}
+                color={isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)"}
+                strokeWidth={1.5}
+              />
+            </Pressable>
           </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Meal selector */}
+          {/* ── Search bar — always visible, outside ScrollView ────────────
+              Sits in the fixed zone. Never scrolls away.
+              On Android the whole sheet shifts up via marginBottom.
+          ──────────────────────────────────────────────────────────── */}
+          <View className="px-4 pb-3">
             <Text
-              className="text-xs font-dmsans uppercase tracking-widest text-neutral-500 mb-2"
-              style={{ color: colors.textMuted }}
-            >
-              Meal
-            </Text>
-            <View className="flex-row flex-wrap gap-2 mb-5">
-              {MEAL_KEYS.map((key) => (
-                <Button
-                  key={key}
-                  onPress={() => setSelectedMeal(key)}
-                  variant={selectedMeal === key ? "primary" : "outline"}
-                  className={`mt-0 rounded-full px-4 py-2 ${
-                    selectedMeal === key ? "bg-black" : "bg-white"
-                  }`}
-                >
-                  <Text
-                    className={`font-dmsans-bold text-sm uppercase tracking-tight ${
-                      selectedMeal === key ? "text-white" : "text-black"
-                    }`}
-                    style={{
-                      color:
-                        selectedMeal === key
-                          ? isDark
-                            ? "#000000"
-                            : "#ffffff"
-                          : colors.text,
-                    }}
-                  >
-                    {key}
-                  </Text>
-                </Button>
-              ))}
-            </View>
-
-            <View
-              className="w-full h-px border border-neutral-200 rounded-xl mb-5"
-              style={{ borderColor: colors.borderMuted }}
-            />
-
-            {/* Search input */}
-            <Text
-              className="text-xs font-dmsans uppercase tracking-widest text-neutral-500 mb-2"
-              style={{ color: colors.textMuted }}
+              className={cn(
+                "font-dmsans text-[10px] uppercase tracking-widest mb-2",
+                isDark ? "text-white/40" : "text-black/40",
+              )}
             >
               Search Food
             </Text>
-            <View className="flex-row gap-2 mb-4">
+            <View className="flex-row gap-2">
               <Input
                 containerClassName="flex-1"
                 value={query}
                 onChangeText={setQuery}
                 onSubmitEditing={handleSearch}
                 returnKeyType="search"
-                placeholder="e.g. chicken biryani"
-                className="py-3"
+                placeholder="e.g. boiled eggs, grilled chicken"
+                autoCorrect={false}
+                autoCapitalize="none"
               />
-              <Button
+              <Pressable
                 onPress={handleSearch}
-                className="mt-0 justify-center px-5 py-3"
+                disabled={searchLoading}
+                className={cn(
+                  "p-4 w-16 rounded-full items-center justify-center",
+                  isDark ? "bg-white" : "bg-black",
+                  searchLoading && "opacity-50",
+                )}
               >
-                <Text className="font-dmsans-bold text-white text-sm uppercase tracking-tight">
-                  Search
-                </Text>
-              </Button>
+                {searchLoading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={isDark ? "#000" : "#fff"}
+                  />
+                ) : (
+                  <Search
+                    size={18}
+                    color={isDark ? "#000" : "#fff"}
+                    strokeWidth={2}
+                  />
+                )}
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Divider */}
+          <View
+            className={cn(
+              "h-px mx-4 mb-1",
+              isDark ? "bg-white/10" : "bg-black/8",
+            )}
+          />
+
+          {/* ── Scrollable zone — height controlled by Dimensions ──────────
+              When keyboard is open: exactly fills space between search bar
+              and top of keyboard. When closed: 45% of screen height.
+          ──────────────────────────────────────────────────────────── */}
+          <ScrollView
+            style={{ height: availableHeight }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 64 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Meal selector */}
+            <Text
+              className={cn(
+                "font-dmsans text-[10px] uppercase tracking-widest mb-2",
+                isDark ? "text-white/40" : "text-black/40",
+              )}
+            >
+              Meal
+            </Text>
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {MEAL_KEYS.map((key) => {
+                const active = selectedMeal === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => setSelectedMeal(key)}
+                    className={cn(
+                      "px-4 py-2 rounded-full border-2",
+                      active
+                        ? isDark
+                          ? "bg-white border-white"
+                          : "bg-black border-black"
+                        : isDark
+                          ? "border-white/20"
+                          : "border-black/15",
+                    )}
+                  >
+                    <Text
+                      className={cn(
+                        "font-dmsans-bold text-xs uppercase tracking-widest",
+                        active
+                          ? isDark
+                            ? "text-black"
+                            : "text-white"
+                          : isDark
+                            ? "text-white/60"
+                            : "text-black/60",
+                      )}
+                    >
+                      {key}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            {/* Error */}
-            {error ? (
+            <View
+              className={cn(
+                "h-px w-full rounded-full mb-4",
+                isDark ? "bg-white/10" : "bg-black/8",
+              )}
+            />
+            {/* Selected items */}
+            {selectedItems.length > 0 && (
+              <>
+                <View
+                  className={cn(
+                    "h-px w-full rounded-full mb-4",
+                    isDark ? "bg-white/10" : "bg-black/8",
+                  )}
+                />
+                <Text
+                  className={cn(
+                    "font-dmsans text-[10px] uppercase tracking-widest mb-2",
+                    isDark ? "text-white/40" : "text-black/40",
+                  )}
+                >
+                  Selected ({selectedItems.length})
+                </Text>
+                <View className="gap-2 mb-4">
+                  {selectedItems.map((item) => (
+                    <View
+                      key={item.foodId}
+                      className={cn(
+                        "border-2 rounded-2xl px-4 py-3 flex-row items-center",
+                        isDark ? "border-white/25" : "border-black/15",
+                      )}
+                    >
+                      <View className="flex-1 mr-3">
+                        <Text
+                          className={cn(
+                            "font-dmsans-bold text-sm",
+                            isDark ? "text-white" : "text-black",
+                          )}
+                          numberOfLines={1}
+                        >
+                          {item.foodName}
+                        </Text>
+                        <Text
+                          className={cn(
+                            "font-dmsans text-xs mt-0.5",
+                            isDark ? "text-white/40" : "text-black/40",
+                          )}
+                        >
+                          {item.servingSize} · {item.calories} kcal · P{" "}
+                          {item.proteinGrams}g · C {item.carbsGrams}g · F{" "}
+                          {item.fatGrams}g
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => handleRemoveItem(item.foodId)}
+                        className={cn(
+                          "w-7 h-7 rounded-full border-2 items-center justify-center",
+                          isDark ? "border-white/20" : "border-black/15",
+                        )}
+                      >
+                        <X
+                          size={13}
+                          color={
+                            isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)"
+                          }
+                          strokeWidth={1.5}
+                        />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {/* Search error */}
+            {searchError ? (
               <Text
-                className="text-black font-dmsans text-sm mb-4 px-1"
-                style={{ color: colors.text }}
+                className={cn(
+                  "font-dmsans text-sm mb-3",
+                  isDark ? "text-white/50" : "text-black/50",
+                )}
               >
-                {error}
+                {searchError}
               </Text>
             ) : null}
 
-            {/* Loading */}
-            {loading ? (
-              <View className="items-center py-6">
-                <ActivityIndicator color={colors.text} size="small" />
-              </View>
-            ) : null}
-
-            {/* Search results */}
-            {!loading && searchResults.length > 0 && (
-              <View className="gap-2 mb-5">
+            {/* Results */}
+            {!searchLoading && searchResults.length > 0 && (
+              <View className="gap-2 mb-4">
                 <Text
-                  className="text-xs font-dmsans uppercase tracking-widest text-neutral-500 mb-1"
-                  style={{ color: colors.textMuted }}
+                  className={cn(
+                    "font-dmsans text-[10px] uppercase tracking-widest mb-1",
+                    isDark ? "text-white/40" : "text-black/40",
+                  )}
                 >
                   Results
                 </Text>
@@ -216,111 +385,105 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                     (i) => i.foodId === item.foodId,
                   );
                   return (
-                    <Button
+                    <Pressable
                       key={item.foodId}
-                      onPress={() => handleAddItem(item)}
-                      disabled={alreadyAdded}
-                      variant="outline"
-                      className={`mt-0 rounded-2xl px-4 py-3 ${
-                        alreadyAdded ? "opacity-40" : "bg-white"
-                      }`}
+                      onPress={() => !alreadyAdded && handleAddItem(item)}
+                      className={cn(
+                        "border-2 rounded-2xl px-4 py-3 flex-row items-center justify-between",
+                        alreadyAdded ? "opacity-40" : "opacity-100",
+                        isDark
+                          ? "border-white/20 bg-white/5"
+                          : "border-black/10 bg-black/[0.02]",
+                      )}
                     >
-                      <Text
-                        className="font-dmsans-bold text-base text-black"
-                        style={{ color: colors.text }}
-                      >
-                        {item.foodName}
-                      </Text>
-                      <Text
-                        className="font-dmsans text-xs text-neutral-500 mt-0.5"
-                        style={{ color: colors.textMuted }}
-                      >
-                        {item.calories} kcal · P {item.proteinGrams}g · C{" "}
-                        {item.carbsGrams}g · F {item.fatGrams}g
-                      </Text>
-                    </Button>
+                      <View className="flex-1 mr-3">
+                        <Text
+                          className={cn(
+                            "font-dmsans-bold text-sm",
+                            isDark ? "text-white" : "text-black",
+                          )}
+                          numberOfLines={1}
+                        >
+                          {item.foodName}
+                        </Text>
+                        <Text
+                          className={cn(
+                            "font-dmsans text-xs mt-0.5",
+                            isDark ? "text-white/40" : "text-black/40",
+                          )}
+                        >
+                          {item.servingSize} · {item.calories} kcal · P{" "}
+                          {item.proteinGrams}g · C {item.carbsGrams}g · F{" "}
+                          {item.fatGrams}g
+                        </Text>
+                      </View>
+                      {alreadyAdded ? (
+                        <CheckCircle2
+                          size={18}
+                          color={
+                            isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)"
+                          }
+                          strokeWidth={1.5}
+                        />
+                      ) : (
+                        <View
+                          className={cn(
+                            "w-7 h-7 rounded-full items-center justify-center",
+                            isDark ? "bg-white" : "bg-black",
+                          )}
+                        >
+                          <Text
+                            className={cn(
+                              "font-dmsans-bold text-base leading-none",
+                              isDark ? "text-black" : "text-white",
+                            )}
+                          >
+                            +
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
                   );
                 })}
               </View>
             )}
 
-            {/* Divider */}
-            {selectedItems.length > 0 && (
-              <View
-                className="w-full h-px border border-neutral-200 rounded-xl mb-4"
-                style={{ borderColor: colors.borderMuted }}
-              />
-            )}
-
-            {/* Selected items */}
-            {selectedItems.length > 0 && (
-              <View className="gap-2 mb-6">
-                <Text
-                  className="text-xs font-dmsans uppercase tracking-widest text-neutral-500 mb-1"
-                  style={{ color: colors.textMuted }}
-                >
-                  Selected ({selectedItems.length})
-                </Text>
-                {selectedItems.map((item) => (
-                  <View
-                    key={item.foodId}
-                    className="border-2 border-black rounded-2xl px-4 py-3 flex-row items-center"
-                    style={{ borderColor: colors.border }}
-                  >
-                    <View className="flex-1">
-                      <Text
-                        className="font-dmsans-bold text-base text-black"
-                        style={{ color: colors.text }}
-                      >
-                        {item.foodName}
-                      </Text>
-                      <Text
-                        className="font-dmsans text-xs text-neutral-500 mt-0.5"
-                        style={{ color: colors.textMuted }}
-                      >
-                        {item.servingSize} · {item.calories} kcal · P{" "}
-                        {item.proteinGrams}g · C {item.carbsGrams}g · F{" "}
-                        {item.fatGrams}g
-                      </Text>
-                    </View>
-                    <Button
-                      onPress={() => handleRemoveItem(item.foodId)}
-                      variant="outline"
-                      size="icon"
-                      className="ml-3 mt-0 rounded-full p-1"
-                    >
-                      <X size={14} color={colors.text} />
-                    </Button>
-                  </View>
-                ))}
-              </View>
-            )}
-
             {/* Footer buttons */}
             <View className="flex-row gap-3">
-              <Button
+              <Pressable
                 onPress={handleClose}
-                variant="outline"
-                className="mt-0 flex-1 items-center py-3"
+                className={cn(
+                  "flex-1 py-4 rounded-full border-2 items-center justify-center",
+                  isDark ? "border-white/20" : "border-black/15",
+                )}
               >
                 <Text
-                  className="font-dmsans-bold text-black text-sm uppercase tracking-tight"
-                  style={{ color: colors.text }}
+                  className={cn(
+                    "font-dmsans-bold text-xs uppercase tracking-widest",
+                    isDark ? "text-white/60" : "text-black/60",
+                  )}
                 >
                   Cancel
                 </Text>
-              </Button>
-              <Button
+              </Pressable>
+              <Pressable
                 onPress={handleSave}
                 disabled={selectedItems.length === 0}
-                className={`mt-0 flex-1 items-center rounded-full py-3 ${
-                  selectedItems.length === 0 ? "opacity-40" : ""
-                }`}
+                className={cn(
+                  "flex-1 py-4 rounded-full items-center justify-center",
+                  isDark ? "bg-white" : "bg-black",
+                  selectedItems.length === 0 && "opacity-30",
+                )}
               >
-                <Text className="font-dmsans-bold text-white text-sm uppercase tracking-tight">
+                <Text
+                  className={cn(
+                    "font-dmsans-bold text-xs uppercase tracking-widest",
+                    isDark ? "text-black" : "text-white",
+                  )}
+                >
                   Save to {selectedMeal}
                 </Text>
-              </Button>
+              </Pressable>
             </View>
           </ScrollView>
         </View>

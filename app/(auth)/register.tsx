@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -238,9 +237,7 @@ const RegisterScreen = () => {
                       />
                     }
                     rightIcon={
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                      <Pressable
                         className="mt-0 h-auto w-auto border-0 p-0"
                         onPress={() => setShowPassword((prev) => !prev)}
                       >
@@ -257,7 +254,7 @@ const RegisterScreen = () => {
                             strokeWidth={2}
                           />
                         )}
-                      </Button>
+                      </Pressable>
                     }
                   />
                 )}
@@ -301,9 +298,7 @@ const RegisterScreen = () => {
                       />
                     }
                     rightIcon={
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                      <Pressable
                         className="mt-0 h-auto w-auto border-0 p-0"
                         onPress={() => setShowConfirm((prev) => !prev)}
                       >
@@ -320,7 +315,7 @@ const RegisterScreen = () => {
                             strokeWidth={2}
                           />
                         )}
-                      </Button>
+                      </Pressable>
                     }
                   />
                 )}

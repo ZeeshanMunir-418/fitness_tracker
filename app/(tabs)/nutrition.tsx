@@ -198,6 +198,7 @@ const NutritionScreen = () => {
             proteinGrams: number;
             carbsGrams: number;
             fatGrams: number;
+            servingSize: string;
           }[];
         }
       >
@@ -211,6 +212,7 @@ const NutritionScreen = () => {
           proteinGrams: Number(item.protein_grams),
           carbsGrams: Number(item.carbs_grams),
           fatGrams: Number(item.fat_grams),
+          servingSize: item.serving_size,
         })) ?? [];
       map[meal.meal_type as MealType] = {
         totalCalories: meal.total_calories,
@@ -579,6 +581,7 @@ const NutritionScreen = () => {
                         fatGrams: Number(item.fat_grams),
                         proteinGrams: Number(item.protein_grams),
                         carbsGrams: Number(item.carbs_grams),
+                        servingSize: item.serving_size,
                       })) ?? [];
 
                     return (
