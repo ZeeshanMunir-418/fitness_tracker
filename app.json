@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.zaindotdev.apexfitnesscoach",
       "infoPlist": {
         "NSMotionUsageDescription": "Allow Apex Fitness Coach to track your steps.",
-        "UIBackgroundModes": ["fetch", "remote-notification"]
+        "UIBackgroundModes": ["fetch", "remote-notification"],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

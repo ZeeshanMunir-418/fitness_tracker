@@ -6,12 +6,7 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "entitlements": {
-          "aps-environment": "development"
-        }
-      }
+      "distribution": "internal"
     },
     "preview": {
       "distribution": "internal",
@@ -20,12 +15,7 @@
       }
     },
     "production": {
-      "autoIncrement": true,
-      "ios": {
-        "entitlements": {
-          "aps-environment": "production"
-        }
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
