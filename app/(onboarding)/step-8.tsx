@@ -4,22 +4,18 @@ import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setSession } from "@/store/slices/authSlice";
 import {
+  generateWorkoutPlan,
   prevStep,
   resetOnboarding,
   saveOnboardingProfile,
 } from "@/store/slices/onboardingSlice";
 import { useRouter } from "expo-router";
+import { Loader2 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Image,
-  Modal,
-  Text,
-  View,
-} from "react-native";
+import { Animated, Image, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 const toKg = (weight: number, unit: "kg" | "lbs") =>
   unit === "kg" ? weight : weight * 0.453592;
@@ -27,7 +23,8 @@ const toKg = (weight: number, unit: "kg" | "lbs") =>
 const toCm = (height: number, unit: "cm" | "ft") =>
   unit === "cm" ? height : height * 30.48;
 
-// One entry per progressStep (0 = idle, never shown; 5 = done)
+// Steps 1-3 block the UI. Step 4 = profile saved → navigate immediately.
+// Plan generation is kicked off after profile save and reflected in the UI.
 const PROGRESS_STAGES: Record<
   number,
   { label: string; sub: string; percent: number }
@@ -35,31 +32,34 @@ const PROGRESS_STAGES: Record<
   1: {
     label: "Verifying your session",
     sub: "Making sure everything is secure…",
-    percent: 10,
+    percent: 15,
   },
   2: {
     label: "Uploading your photo",
     sub: "Adding your profile picture…",
-    percent: 25,
+    percent: 40,
   },
   3: {
     label: "Saving your profile",
     sub: "Storing your goals and preferences…",
-    percent: 45,
+    percent: 75,
   },
   4: {
-    label: "Building your plans",
-    sub: "Generating your personalised workout & meal plan…",
-    percent: 70,
-  },
-  5: {
-    label: "Almost there!",
-    sub: "Putting the finishing touches on your journey…",
+    label: "All done!",
+    sub: "Taking you to the app…",
     percent: 100,
   },
 };
 
-// ── animated progress bar ────────────────────────────────────────────────────
+const SOFT_DEPTH_SHADOW = {
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 12 },
+  shadowOpacity: 0.12,
+  shadowRadius: 18,
+  elevation: 14,
+} as const;
+
+// ── animated progress bar ─────────────────────────────────────────────────────
 
 function ProgressBar({
   percent,
@@ -87,115 +87,187 @@ function ProgressBar({
 
   return (
     <View
+      className="h-1.5 w-full overflow-hidden rounded-full"
       style={{
-        height: 6,
-        borderRadius: 999,
         backgroundColor: trackColor,
-        overflow: "hidden",
-        width: "100%",
       }}
     >
       <Animated.View
+        className="h-full rounded-full"
         style={{
-          height: "100%",
           width,
           backgroundColor: color,
-          borderRadius: 999,
         }}
       />
     </View>
   );
 }
 
-// ── main screen ──────────────────────────────────────────────────────────────
+function SpinningLoader({ color }: { color: string }) {
+  const spin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [spin]);
+
+  const rotate = spin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Loader2 size={18} color={color} />
+    </Animated.View>
+  );
+}
+
+// ── main screen ───────────────────────────────────────────────────────────────
 
 const StepEightScreen = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { colors } = useTheme();
-  const { data, loading, error, progressStep } = useAppSelector(
-    (s) => s.onboarding,
-  );
-  const session = useAppSelector((s) => s.auth.session);
+  const insets = useSafeAreaInsets();
+  const {
+    data,
+    loading,
+    error,
+    progressStep,
+    planGenerationLoading,
+    planGenerationProgress,
+    planGenerationMessage,
+    planGenerationError,
+  } = useAppSelector((s) => s.onboarding);
+  const hasStartedPlanGenerationRef = useRef(false);
+  const hasNavigatedRef = useRef(false);
 
   const { bmi, bmr, calories } = useMemo(() => {
     const weightKg = data.currentWeight
-      ? toKg(data.currentWeight, data.weightUnit)
+      ? Number(toKg(data.currentWeight, data.weightUnit))
       : 0;
-    const heightCm = data.height ? toCm(data.height, data.heightUnit) : 0;
-    const age = data.age ?? 30;
 
-    const bmiValue =
-      weightKg > 0 && heightCm > 0 ? weightKg / Math.pow(heightCm / 100, 2) : 0;
+    const heightCm = data.height
+      ? Number(toCm(data.height, data.heightUnit))
+      : 0;
 
+    const age = Number.isFinite(data.age) ? data.age! : 30;
+
+    if (weightKg <= 0 || heightCm <= 0) {
+      return { bmi: 0, bmr: 0, calories: 0 };
+    }
+
+    // --- BMI ---
+    const heightM = heightCm / 100;
+    const bmiValue = weightKg / (heightM * heightM);
+
+    // --- BMR (Mifflin-St Jeor Equation — most accurate clinically) ---
     const isFemale = data.gender === "female";
-    const bmrValue =
-      weightKg > 0 && heightCm > 0
-        ? 10 * weightKg + 6.25 * heightCm - 5 * age + (isFemale ? -161 : 5)
-        : 0;
 
-    const activityFactorMap = {
+    const bmrValue =
+      10 * weightKg + 6.25 * heightCm - 5 * age + (isFemale ? -161 : 5);
+
+    // --- Activity Multipliers ---
+    const activityFactorMap: Record<string, number> = {
       sedentary: 1.2,
       lightly_active: 1.375,
       moderately_active: 1.55,
       very_active: 1.725,
       athlete: 1.9,
-    } as const;
+    };
 
-    const factor = data.activityLevel
-      ? activityFactorMap[data.activityLevel]
-      : 1.2;
+    const factor = activityFactorMap[data.activityLevel ?? "sedentary"] ?? 1.2;
+
+    const caloriesValue = bmrValue * factor;
 
     return {
-      bmi: bmiValue,
-      bmr: bmrValue,
-      calories: bmrValue * factor,
+      bmi: Number(bmiValue.toFixed(2)),
+      bmr: Math.round(bmrValue),
+      calories: Math.round(caloriesValue),
     };
-  }, [data]);
+  }, [
+    data.currentWeight,
+    data.weightUnit,
+    data.height,
+    data.heightUnit,
+    data.age,
+    data.gender,
+    data.activityLevel,
+  ]);
 
-  // ── once thunk completes (progressStep === 5), re-check onboarding
-  //    status from Supabase so _layout cache is warm, then navigate ──────────
   useEffect(() => {
-    if (progressStep !== 5 || loading) return;
+    if (progressStep !== 4 || loading || hasStartedPlanGenerationRef.current) {
+      return;
+    }
+
+    hasStartedPlanGenerationRef.current = true;
 
     let active = true;
 
     const finish = async () => {
-      // Hold on "Almost there!" frame so it's readable before transitioning
-      await new Promise((r) => setTimeout(r, 800));
+      // Brief pause so profile completion stage is readable before AI plan starts.
+      await new Promise((r) => setTimeout(r, 600));
       if (!active) return;
 
-      // Re-fetch session so Redux is fully up to date before nav guard runs
       const { data: sd } = await supabase.auth.getSession();
       if (sd?.session && active) {
         dispatch(setSession({ user: sd.session.user, session: sd.session }));
       }
-
       if (!active) return;
+      const profilePayload: Record<string, unknown> = {
+        id: sd?.session?.user?.id,
+        primary_goal: data.primaryGoal,
+        activity_level: data.activityLevel,
+        preferred_workout_type: data.preferredWorkoutType,
+        workout_duration: data.workoutDuration,
+        workout_days_per_week: data.workoutDaysPerWeek,
+        age: data.age,
+        gender: data.gender,
+        current_weight: data.currentWeight,
+        weight_unit: data.weightUnit,
+        height: data.height,
+        height_unit: data.heightUnit,
+      };
 
-      // ✅ Navigate FIRST — /(tabs) must be mounted before we wipe onboarding
-      // state, otherwise the brief currentStep: 1 reset flashes step-1 on screen.
-      router.replace("/(tabs)");
-
-      // ✅ Reset AFTER nav settles — 500 ms gives the new screen time to fully
-      // mount and the onboarding stack to unmount before Redux state is cleared.
-      setTimeout(() => {
-        if (active) dispatch(resetOnboarding());
-      }, 500);
+      void dispatch(generateWorkoutPlan(profilePayload));
     };
 
-    finish();
+    void finish();
 
-    // ✅ Cleanup is on the useEffect return, NOT inside finish()
     return () => {
       active = false;
     };
-  }, [progressStep, loading, dispatch, router]);
+  }, [progressStep, loading, dispatch, router, data]);
+
+  useEffect(() => {
+    if (progressStep !== 4 || hasNavigatedRef.current) {
+      return;
+    }
+
+    hasNavigatedRef.current = true;
+
+    const timeoutId = setTimeout(() => {
+      router.replace("/(tabs)");
+
+      setTimeout(() => {
+        dispatch(resetOnboarding());
+      }, 400);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [dispatch, progressStep, router]);
 
   const handleFinish = async () => {
     await dispatch(saveOnboardingProfile());
-    // Navigation is handled in the effect above once progressStep hits 5.
-    // If rejected the overlay auto-closes (progressStep resets to 0 in slice).
   };
 
   const stats = [
@@ -207,8 +279,18 @@ const StepEightScreen = () => {
     },
   ];
 
-  const stage = PROGRESS_STAGES[progressStep];
-  const showOverlay = loading || progressStep === 5;
+  const profileStage = PROGRESS_STAGES[progressStep] ?? null;
+  const profilePercent = profileStage?.percent ?? 0;
+  const aiPercent = planGenerationProgress;
+  const showProgressDock =
+    loading || progressStep > 0 || planGenerationLoading || aiPercent > 0;
+
+  const headline =
+    planGenerationLoading || aiPercent > 0
+      ? "Your AI coach is building your personalized plan."
+      : loading || progressStep > 0
+        ? "Finishing your profile setup."
+        : "You're all set. Let's get to work.";
 
   return (
     <>
@@ -226,26 +308,22 @@ const StepEightScreen = () => {
         nextDisabled={loading}
       >
         {/* Mascot */}
-        <View style={{ alignItems: "center", marginBottom: 8 }}>
+        <View className="mb-2 items-center">
           <Image
             source={require("@/assets/images/ghost-mascot.png")}
-            style={{ height: 128, width: 128 }}
+            className="h-32 w-32"
             resizeMode="contain"
           />
         </View>
 
         {/* Stat cards */}
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+        <View className="mt-3 flex-row gap-2">
           {stats.map((stat) => (
             <View
               key={stat.label}
+              className="flex-1 items-center rounded-3xl border-2 p-4"
               style={{
-                flex: 1,
-                borderRadius: 24,
-                borderWidth: 2,
                 borderColor: colors.border,
-                padding: 16,
-                alignItems: "center",
               }}
             >
               <Text
@@ -255,8 +333,8 @@ const StepEightScreen = () => {
                 {stat.value}
               </Text>
               <Text
-                style={{ color: colors.textMuted, marginTop: 4 }}
-                className="font-dmsans text-xs text-center"
+                style={{ color: colors.textMuted }}
+                className="mt-1 font-dmsans text-xs text-center"
               >
                 {stat.label}
               </Text>
@@ -266,22 +344,18 @@ const StepEightScreen = () => {
 
         {/* Headline */}
         <Text
-          style={{ color: colors.text, marginTop: 24 }}
-          className="font-dmsans-bold text-lg text-center"
+          style={{ color: colors.text }}
+          className="mt-6 font-dmsans-bold text-lg text-center"
         >
-          You're all set. Let's get to work.
+          {headline}
         </Text>
 
         {/* Profile summary */}
         <View
+          className="mt-5 gap-2.5 rounded-[20px] border-2 p-4"
           style={{
-            marginTop: 20,
-            borderRadius: 20,
-            borderWidth: 2,
             borderColor: colors.cardBorder,
             backgroundColor: colors.card,
-            padding: 16,
-            gap: 10,
           }}
         >
           {[
@@ -313,11 +387,7 @@ const StepEightScreen = () => {
           ].map((row) => (
             <View
               key={row.label}
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
+              className="flex-row items-center justify-between"
             >
               <Text
                 style={{ color: colors.textMuted }}
@@ -335,77 +405,112 @@ const StepEightScreen = () => {
           ))}
         </View>
 
-        {/* Inline error (only shown when overlay is closed) */}
         {error ? (
           <Text
-            style={{ color: "#ef4444", marginTop: 12 }}
-            className="font-dmsans text-sm text-center"
+            style={{ color: "#ef4444" }}
+            className="mt-3 font-dmsans text-sm text-center"
           >
             {error}
           </Text>
         ) : null}
+
+        {planGenerationError ? (
+          <Text
+            style={{ color: "#ef4444" }}
+            className="mt-2 font-dmsans text-sm text-center"
+          >
+            {planGenerationError}
+          </Text>
+        ) : null}
+
+        <View className="h-44" />
       </OnboardingShell>
 
-      {/* ── Progress overlay ─────────────────────────────────────────────── */}
-      <Modal visible={showOverlay} transparent animationType="fade">
-        {/* dark scrim */}
+      {showProgressDock ? (
         <View
+          pointerEvents="none"
+          className="rounded-3xl border-2 px-4 py-4"
           style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.65)",
-            alignItems: "center",
-            justifyContent: "center",
-            paddingHorizontal: 32,
+            position: "absolute",
+            left: 16,
+            right: 16,
+            bottom: insets.bottom + 14,
+            zIndex: 20,
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+            ...SOFT_DEPTH_SHADOW,
           }}
         >
-          <View
-            style={{
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              borderWidth: 2,
-              borderRadius: 28,
-              padding: 32,
-              width: "100%",
-              alignItems: "center",
-              gap: 20,
-            }}
-          >
-            {/* Spinner */}
-            <ActivityIndicator size="large" color={colors.text} />
-
-            {/* Label */}
-            <View style={{ alignItems: "center", gap: 6 }}>
-              <Text
-                style={{ color: colors.text }}
-                className="font-dmsans-bold text-xl text-center"
-              >
-                {stage?.label ?? "Please wait…"}
-              </Text>
+          <View className="mb-3 flex-row items-center justify-between">
+            <Text
+              style={{ color: colors.text }}
+              className="font-dmsans-bold text-sm"
+            >
+              Profile Completion
+            </Text>
+            <View className="flex-row items-center gap-2">
+              {loading || progressStep > 0 ? (
+                <SpinningLoader color={colors.text} />
+              ) : null}
               <Text
                 style={{ color: colors.textMuted }}
-                className="font-dmsans text-sm text-center"
-              >
-                {stage?.sub ?? ""}
-              </Text>
-            </View>
-
-            {/* Animated progress bar */}
-            <View style={{ width: "100%", gap: 8 }}>
-              <ProgressBar
-                percent={stage?.percent ?? 0}
-                color={colors.text}
-                trackColor={colors.border}
-              />
-              <Text
-                style={{ color: colors.textMuted, alignSelf: "flex-end" }}
                 className="font-dmsans text-xs"
               >
-                {stage?.percent ?? 0}%
+                {Math.round(profilePercent)}%
               </Text>
             </View>
           </View>
+          <ProgressBar
+            percent={profilePercent}
+            color={colors.text}
+            trackColor={colors.cardBorder}
+          />
+          {profileStage ? (
+            <Text
+              style={{ color: colors.textMuted }}
+              className="mt-2 font-dmsans text-xs"
+            >
+              {profileStage.sub}
+            </Text>
+          ) : null}
+
+          <View
+            className="my-3"
+            style={{ borderTopWidth: 1, borderColor: colors.cardBorder }}
+          />
+
+          <View className="mb-3 flex-row items-center justify-between">
+            <Text
+              style={{ color: colors.text }}
+              className="font-dmsans-bold text-sm"
+            >
+              AI Plan Generation
+            </Text>
+            <View className="flex-row items-center gap-2">
+              {planGenerationLoading ? (
+                <SpinningLoader color={colors.text} />
+              ) : null}
+              <Text
+                style={{ color: colors.textMuted }}
+                className="font-dmsans text-xs"
+              >
+                {Math.round(aiPercent)}%
+              </Text>
+            </View>
+          </View>
+          <ProgressBar
+            percent={aiPercent}
+            color={colors.text}
+            trackColor={colors.cardBorder}
+          />
+          <Text
+            style={{ color: colors.textMuted }}
+            className="mt-2 font-dmsans text-xs"
+          >
+            {planGenerationMessage || "Waiting for profile completion..."}
+          </Text>
         </View>
-      </Modal>
+      ) : null}
     </>
   );
 };

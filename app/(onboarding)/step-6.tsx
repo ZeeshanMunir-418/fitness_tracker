@@ -5,18 +5,18 @@ import Input from "@/components/ui/input";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-  nextStep,
-  prevStep,
-  updateOnboardingData,
+    nextStep,
+    prevStep,
+    updateOnboardingData,
 } from "@/store/slices/onboardingSlice";
 import { Href, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    Text,
+    View,
 } from "react-native";
 
 const weeklyOptions = [
@@ -66,12 +66,12 @@ const StepSixScreen = () => {
       nextDisabled={nextDisabled}
     >
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={{ gap: 24 }}>
+        <View className="gap-6">
           {/* ── Target Weight ─────────────────────────────────────────── */}
-          <View style={{ gap: 8 }}>
+          <View className="gap-2">
             <Text
               style={{ color: colors.textMuted }}
               className="font-dmsans text-xs uppercase tracking-widest"
@@ -97,7 +97,7 @@ const StepSixScreen = () => {
           </View>
 
           {/* ── Target Date ───────────────────────────────────────────── */}
-          <View style={{ gap: 8 }}>
+          <View className="gap-2">
             <Text
               style={{ color: colors.textMuted }}
               className="font-dmsans text-xs uppercase tracking-widest"
@@ -134,7 +134,7 @@ const StepSixScreen = () => {
           </View>
 
           {/* ── Weekly Weight Change ──────────────────────────────────── */}
-          <View style={{ gap: 8 }}>
+          <View className="gap-2">
             <Text
               style={{ color: colors.textMuted }}
               className="font-dmsans text-xs uppercase tracking-widest"
@@ -154,11 +154,8 @@ const StepSixScreen = () => {
                         }),
                       )
                     }
+                    className="rounded-full border-2 px-4 py-3"
                     style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      borderRadius: 999,
-                      borderWidth: 2,
                       borderColor: active ? colors.border : colors.borderMuted,
                       backgroundColor: active ? colors.text : "transparent",
                     }}
@@ -166,9 +163,8 @@ const StepSixScreen = () => {
                     <Text
                       style={{
                         color: active ? colors.background : colors.text,
-                        fontSize: 13,
                       }}
-                      className="font-dmsans-bold"
+                      className="font-dmsans-bold text-[13px]"
                     >
                       {option.label}
                     </Text>

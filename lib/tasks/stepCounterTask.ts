@@ -30,10 +30,13 @@ TaskManager.defineTask(STEP_COUNTER_TASK, async () => {
     const hardwareSteps = result.steps;
     console.log("[stepTask] hardware steps since midnight:", hardwareSteps);
 
+    // getStepCountAsync already returns steps since midnight,
+    // so baseline should be 0, not the raw hardware count.
     let baseline = await readBaseline();
-    if (!baseline) {
-      await saveBaseline(hardwareSteps);
-      baseline = hardwareSteps;
+    if (baseline === null) {
+      await saveBaseline(0, true);
+      baseline = 0;
+      console.log("[stepTask] baseline initialized to 0");
     }
 
     const todaySteps = Math.max(0, hardwareSteps - baseline);

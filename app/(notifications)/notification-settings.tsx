@@ -7,11 +7,11 @@ import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -67,7 +67,6 @@ export default function NotificationSettingsScreen() {
           preferred_workout_time: preferredWorkoutTime,
         }),
       ).unwrap();
-      console.log("[notificationSettings] save success");
       router.back();
     } catch (saveError) {
       console.error("[notificationSettings] save failed", saveError);

@@ -164,31 +164,6 @@ const ProfileScreen = () => {
             <Toggle value={isDark} onValueChange={handleDarkModeToggle} />
           ),
         },
-        {
-          id: "system-theme",
-          title: "Use System Default",
-          description: "Follow your device appearance automatically.",
-          rightComponent: (
-            <Pressable
-              onPress={handleUseSystemDefault}
-              className="rounded-full px-3 py-1.5"
-              style={{
-                borderWidth: 2,
-                borderColor: followSystem ? colors.border : colors.borderMuted,
-                backgroundColor: followSystem ? colors.text : colors.card,
-              }}
-            >
-              <Text
-                className="text-xs font-dmsans-bold"
-                style={{
-                  color: followSystem ? colors.background : colors.text,
-                }}
-              >
-                {followSystem ? "Active" : "Use"}
-              </Text>
-            </Pressable>
-          ),
-        },
       ],
     },
     {

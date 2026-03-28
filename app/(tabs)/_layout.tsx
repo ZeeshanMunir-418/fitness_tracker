@@ -1,17 +1,9 @@
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppSelector } from "@/store/hooks";
-import { selectUnreadCount } from "@/store/slices/notificationSlice";
 import { Tabs, useRouter } from "expo-router";
-import {
-  Activity,
-  Bell,
-  Dumbbell,
-  Home,
-  User,
-  Utensils,
-} from "lucide-react-native";
+import { Activity, Dumbbell, Home, User } from "lucide-react-native";
 import React, { useEffect } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconProps = {
@@ -73,6 +65,8 @@ const TabsLayout = () => {
             bottom: tabBarBottom,
             borderRadius: 30,
             shadowOpacity: isDark ? 0 : 0.08,
+            shadowOffset: { width: 0, height: 4 },
+            shadowRadius: 12,
           },
         }}
       >
@@ -81,13 +75,6 @@ const TabsLayout = () => {
           options={{
             title: "Home",
             tabBarIcon: (props) => renderTabIcon(Home, props),
-          }}
-        />
-        <Tabs.Screen
-          name="nutrition"
-          options={{
-            title: "Nutrition",
-            tabBarIcon: (props) => renderTabIcon(Utensils, props),
           }}
         />
         <Tabs.Screen

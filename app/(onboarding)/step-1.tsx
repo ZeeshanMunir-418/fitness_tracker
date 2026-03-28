@@ -7,14 +7,8 @@ import { nextStep, updateOnboardingData } from "@/store/slices/onboardingSlice";
 import * as ImagePicker from "expo-image-picker";
 import { Href, useRouter } from "expo-router";
 import { User2 } from "lucide-react-native";
-import React, { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import React, { useRef, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 
 const genders = [
   { label: "Male", value: "male" as const },
@@ -22,11 +16,22 @@ const genders = [
   { label: "Prefer not to say", value: "prefer_not_to_say" as const },
 ];
 
-const StepOneScreen = () => {
+interface StepOneProps {
+  // Injected by OnboardingShell — scroll the given input ref into view
+  onInputFocus?: (ref: React.RefObject<any>) => void;
+}
+
+const StepOneScreen = ({ onInputFocus }: StepOneProps) => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { colors } = useTheme();
   const data = useAppSelector((s) => s.onboarding.data);
+
+  // One ref per TextInput so the shell can measure each individually
+  const nameRef = useRef<any>(null);
+  const ageRef = useRef<any>(null);
+  const heightRef = useRef<any>(null);
+  const weightRef = useRef<any>(null);
 
   const [heightText, setHeightText] = useState(
     data.height ? String(data.height) : "",
@@ -77,290 +82,254 @@ const StepOneScreen = () => {
       }}
       nextDisabled={nextDisabled}
     >
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <View style={{ gap: 20 }}>
-          {/* ── Avatar ──────────────────────────────────────────────────── */}
-          <View style={{ gap: 12 }}>
-            <Text
-              style={{ color: colors.textMuted }}
-              className="font-dmsans text-xs uppercase tracking-widest"
-            >
-              Profile Photo (Optional)
-            </Text>
-            <View className="flex-row items-center gap-4">
-              <Avatar className="h-16 w-16">
-                <AvatarImage source={{ uri: data.avatarUri ?? undefined }} />
-                <AvatarFallback style={{ backgroundColor: colors.card }}>
-                  <User2 size={28} color={colors.textMuted} />
-                </AvatarFallback>
-              </Avatar>
-              <View className="flex-1 flex-row gap-2">
+      <View className="gap-5">
+        {/* ── Avatar ──────────────────────────────────────────────────── */}
+        <View className="gap-3">
+          <Text
+            className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
+          >
+            Profile Photo (Optional)
+          </Text>
+          <View className="flex-row items-center gap-4">
+            <Avatar className="h-16 w-16">
+              <AvatarImage source={{ uri: data.avatarUri ?? undefined }} />
+              <AvatarFallback style={{ backgroundColor: colors.card }}>
+                <User2 size={28} color={colors.textMuted} />
+              </AvatarFallback>
+            </Avatar>
+            <View className="flex-1 flex-row gap-2">
+              <Pressable
+                onPress={handlePickAvatar}
+                disabled={pickingAvatar}
+                className="flex-1 items-center justify-center rounded-full border-2 px-4 py-3"
+                style={{ borderColor: colors.border }}
+              >
+                <Text
+                  className="font-dmsans-bold text-xs uppercase tracking-widest"
+                  style={{ color: colors.text }}
+                >
+                  Upload
+                </Text>
+              </Pressable>
+              {data.avatarUri ? (
                 <Pressable
-                  onPress={handlePickAvatar}
-                  disabled={pickingAvatar}
+                  onPress={() =>
+                    dispatch(updateOnboardingData({ avatarUri: null }))
+                  }
+                  className="flex-1 items-center justify-center rounded-full border-2 px-4 py-3"
+                  style={{ borderColor: colors.border }}
+                >
+                  <Text
+                    className="font-dmsans-bold text-xs uppercase tracking-widest"
+                    style={{ color: colors.text }}
+                  >
+                    Remove
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        </View>
+
+        {/* ── Full Name ────────────────────────────────────────────────── */}
+        <View className="gap-2">
+          <Text
+            className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
+          >
+            Full Name
+          </Text>
+          <Input
+            ref={nameRef}
+            value={data.fullName}
+            onChangeText={(v) =>
+              dispatch(updateOnboardingData({ fullName: v }))
+            }
+            onFocus={() => onInputFocus?.(nameRef)}
+            placeholder="Your full name"
+          />
+        </View>
+
+        {/* ── Age ─────────────────────────────────────────────────────── */}
+        <View className="gap-2">
+          <Text
+            className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
+          >
+            Age
+          </Text>
+          <Input
+            ref={ageRef}
+            value={data.age ? String(data.age) : ""}
+            onChangeText={(v) =>
+              dispatch(
+                updateOnboardingData({
+                  age: v ? Number(v.replace(/[^0-9]/g, "")) : null,
+                }),
+              )
+            }
+            onFocus={() => onInputFocus?.(ageRef)}
+            keyboardType="number-pad"
+            placeholder="Enter age"
+          />
+        </View>
+
+        {/* ── Gender ──────────────────────────────────────────────────── */}
+        <View className="gap-2">
+          <Text
+            className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
+          >
+            Gender
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {genders.map((option) => {
+              const active = data.gender === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() =>
+                    dispatch(updateOnboardingData({ gender: option.value }))
+                  }
+                  className="rounded-full border-2 px-4 py-3"
                   style={{
-                    flex: 1,
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    borderRadius: 999,
-                    borderWidth: 2,
-                    borderColor: colors.border,
-                    alignItems: "center",
-                    justifyContent: "center",
+                    borderColor: active ? colors.border : colors.borderMuted,
+                    backgroundColor: active ? colors.text : "transparent",
                   }}
                 >
                   <Text
-                    style={{ color: colors.text }}
-                    className="font-dmsans-bold text-xs uppercase tracking-widest"
+                    className="font-dmsans-bold text-[13px]"
+                    style={{ color: active ? colors.background : colors.text }}
                   >
-                    Upload
+                    {option.label}
                   </Text>
                 </Pressable>
-                {data.avatarUri ? (
-                  <Pressable
-                    onPress={() =>
-                      dispatch(updateOnboardingData({ avatarUri: null }))
-                    }
-                    style={{
-                      flex: 1,
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 999,
-                      borderWidth: 2,
-                      borderColor: colors.border,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text
-                      style={{ color: colors.text }}
-                      className="font-dmsans-bold text-xs uppercase tracking-widest"
-                    >
-                      Remove
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
+              );
+            })}
           </View>
+        </View>
 
-          {/* ── Full Name ────────────────────────────────────────────────── */}
-          <View style={{ gap: 8 }}>
-            <Text
-              style={{ color: colors.textMuted }}
-              className="font-dmsans text-xs uppercase tracking-widest"
-            >
-              Full Name
-            </Text>
+        {/* ── Height ──────────────────────────────────────────────────── */}
+        <View className="gap-2">
+          <Text
+            className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
+          >
+            Height
+          </Text>
+          <View className="flex-row items-center gap-2">
             <Input
-              value={data.fullName}
-              onChangeText={(value) =>
-                dispatch(updateOnboardingData({ fullName: value }))
-              }
-              placeholder="Your full name"
-            />
-          </View>
-
-          {/* ── Age ─────────────────────────────────────────────────────── */}
-          <View style={{ gap: 8 }}>
-            <Text
-              style={{ color: colors.textMuted }}
-              className="font-dmsans text-xs uppercase tracking-widest"
-            >
-              Age
-            </Text>
-            <Input
-              value={data.age ? String(data.age) : ""}
-              onChangeText={(value) =>
+              ref={heightRef}
+              containerClassName="flex-1"
+              value={heightText}
+              onChangeText={(v) => {
+                const s = v.replace(/[^0-9.]/g, "");
+                setHeightText(s);
+                const n = s ? parseFloat(s) : null;
                 dispatch(
                   updateOnboardingData({
-                    age: value ? Number(value.replace(/[^0-9]/g, "")) : null,
+                    height: n !== null && !isNaN(n) ? n : null,
                   }),
-                )
-              }
-              keyboardType="number-pad"
-              placeholder="Enter age"
+                );
+              }}
+              onFocus={() => onInputFocus?.(heightRef)}
+              keyboardType="decimal-pad"
+              placeholder="Height"
             />
-          </View>
-
-          {/* ── Gender ──────────────────────────────────────────────────── */}
-          <View style={{ gap: 8 }}>
-            <Text
-              style={{ color: colors.textMuted }}
-              className="font-dmsans text-xs uppercase tracking-widest"
+            {/* Unit toggle */}
+            <View
+              className="flex-row rounded-full border-2 p-1"
+              style={{ borderColor: colors.border }}
             >
-              Gender
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {genders.map((option) => {
-                const active = data.gender === option.value;
+              {(["cm", "ft"] as const).map((unit) => {
+                const active = data.heightUnit === unit;
                 return (
                   <Pressable
-                    key={option.value}
+                    key={unit}
                     onPress={() =>
-                      dispatch(updateOnboardingData({ gender: option.value }))
+                      dispatch(updateOnboardingData({ heightUnit: unit }))
                     }
+                    className="rounded-full px-3.5 py-2.5"
                     style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      borderRadius: 999,
-                      borderWidth: 2,
-                      borderColor: active ? colors.border : colors.borderMuted,
                       backgroundColor: active ? colors.text : "transparent",
                     }}
                   >
                     <Text
+                      className="font-dmsans-bold text-xs uppercase"
                       style={{
                         color: active ? colors.background : colors.text,
-                        fontSize: 13,
                       }}
-                      className="font-dmsans-bold"
                     >
-                      {option.label}
+                      {unit}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
           </View>
+        </View>
 
-          {/* ── Height ──────────────────────────────────────────────────── */}
-          <View style={{ gap: 8 }}>
-            <Text
-              style={{ color: colors.textMuted }}
-              className="font-dmsans text-xs uppercase tracking-widest"
+        {/* ── Current Weight ───────────────────────────────────────────── */}
+        <View className="gap-2">
+          <Text
+            className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
+          >
+            Current Weight
+          </Text>
+          <View className="flex-row items-center gap-2">
+            <Input
+              ref={weightRef}
+              containerClassName="flex-1"
+              value={weightText}
+              onChangeText={(v) => {
+                const s = v.replace(/[^0-9.]/g, "");
+                setWeightText(s);
+                const n = s ? parseFloat(s) : null;
+                dispatch(
+                  updateOnboardingData({
+                    currentWeight: n !== null && !isNaN(n) ? n : null,
+                  }),
+                );
+              }}
+              onFocus={() => onInputFocus?.(weightRef)}
+              keyboardType="decimal-pad"
+              placeholder="Weight"
+            />
+            {/* Unit toggle */}
+            <View
+              className="flex-row rounded-full border-2 p-1"
+              style={{ borderColor: colors.border }}
             >
-              Height
-            </Text>
-            <View className="flex-row items-center gap-2">
-              <Input
-                containerClassName="flex-1"
-                value={heightText}
-                onChangeText={(value) => {
-                  const sanitized = value.replace(/[^0-9.]/g, "");
-                  setHeightText(sanitized);
-                  const parsed = sanitized ? parseFloat(sanitized) : null;
-                  dispatch(
-                    updateOnboardingData({
-                      height: parsed !== null && !isNaN(parsed) ? parsed : null,
-                    }),
-                  );
-                }}
-                keyboardType="decimal-pad"
-                placeholder="Height"
-              />
-              {/* Unit toggle */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  borderRadius: 999,
-                  borderWidth: 2,
-                  borderColor: colors.border,
-                  padding: 4,
-                }}
-              >
-                {(["cm", "ft"] as const).map((unit) => {
-                  const active = data.heightUnit === unit;
-                  return (
-                    <Pressable
-                      key={unit}
-                      onPress={() =>
-                        dispatch(updateOnboardingData({ heightUnit: unit }))
-                      }
+              {(["kg", "lbs"] as const).map((unit) => {
+                const active = data.weightUnit === unit;
+                return (
+                  <Pressable
+                    key={unit}
+                    onPress={() =>
+                      dispatch(updateOnboardingData({ weightUnit: unit }))
+                    }
+                    className="rounded-full px-3.5 py-2.5"
+                    style={{
+                      backgroundColor: active ? colors.text : "transparent",
+                    }}
+                  >
+                    <Text
+                      className="font-dmsans-bold text-xs uppercase"
                       style={{
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 999,
-                        backgroundColor: active ? colors.text : "transparent",
+                        color: active ? colors.background : colors.text,
                       }}
                     >
-                      <Text
-                        style={{
-                          color: active ? colors.background : colors.text,
-                          fontSize: 12,
-                        }}
-                        className="font-dmsans-bold uppercase"
-                      >
-                        {unit}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          </View>
-
-          {/* ── Current Weight ───────────────────────────────────────────── */}
-          <View style={{ gap: 8 }}>
-            <Text
-              style={{ color: colors.textMuted }}
-              className="font-dmsans text-xs uppercase tracking-widest"
-            >
-              Current Weight
-            </Text>
-            <View className="flex-row items-center gap-2">
-              <Input
-                containerClassName="flex-1"
-                value={weightText}
-                onChangeText={(value) => {
-                  const sanitized = value.replace(/[^0-9.]/g, "");
-                  setWeightText(sanitized);
-                  const parsed = sanitized ? parseFloat(sanitized) : null;
-                  dispatch(
-                    updateOnboardingData({
-                      currentWeight:
-                        parsed !== null && !isNaN(parsed) ? parsed : null,
-                    }),
-                  );
-                }}
-                keyboardType="decimal-pad"
-                placeholder="Weight"
-              />
-              {/* Unit toggle */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  borderRadius: 999,
-                  borderWidth: 2,
-                  borderColor: colors.border,
-                  padding: 4,
-                }}
-              >
-                {(["kg", "lbs"] as const).map((unit) => {
-                  const active = data.weightUnit === unit;
-                  return (
-                    <Pressable
-                      key={unit}
-                      onPress={() =>
-                        dispatch(updateOnboardingData({ weightUnit: unit }))
-                      }
-                      style={{
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 999,
-                        backgroundColor: active ? colors.text : "transparent",
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: active ? colors.background : colors.text,
-                          fontSize: 12,
-                        }}
-                        className="font-dmsans-bold uppercase"
-                      >
-                        {unit}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                      {unit}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </OnboardingShell>
   );
 };

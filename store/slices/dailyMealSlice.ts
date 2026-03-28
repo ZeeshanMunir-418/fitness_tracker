@@ -62,8 +62,6 @@ export const fetchTodayMeals = createAsyncThunk<
   void,
   ThunkConfig
 >("dailyMeal/fetchTodayMeals", async (_, { getState, rejectWithValue }) => {
-  console.log("[dailyMeal] fetchTodayMeals start");
-
   try {
     const userId = getState().auth.user?.id;
     const today = getTodayIsoDate();
@@ -87,12 +85,6 @@ export const fetchTodayMeals = createAsyncThunk<
     const meals = (data ?? []) as DailyMeal[];
     const todayCalories = calculateCalories(meals);
 
-    console.log("[dailyMeal] fetchTodayMeals end", {
-      date: today,
-      mealsCount: meals.length,
-      todayCalories,
-    });
-
     return { meals, todayCalories };
   } catch (error) {
     console.error("[dailyMeal] fetchTodayMeals failed", error);
@@ -112,8 +104,6 @@ export const fetchMealsForDate = createAsyncThunk<
 >(
   "dailyMeal/fetchMealsForDate",
   async (date, { getState, rejectWithValue }) => {
-    console.log("[dailyMeal] fetchMealsForDate start", { date });
-
     try {
       const userId = getState().auth.user?.id;
 
@@ -135,12 +125,6 @@ export const fetchMealsForDate = createAsyncThunk<
 
       const meals = (data ?? []) as DailyMeal[];
       const todayCalories = calculateCalories(meals);
-
-      console.log("[dailyMeal] fetchMealsForDate end", {
-        date,
-        mealsCount: meals.length,
-        todayCalories,
-      });
 
       return { meals, todayCalories };
     } catch (error) {
@@ -164,8 +148,6 @@ export const upsertDailyMeal = createAsyncThunk<
 >(
   "dailyMeal/upsertDailyMeal",
   async (payload, { getState, rejectWithValue }) => {
-    console.log("[dailyMeal] upsertDailyMeal start", payload);
-
     try {
       const userId = getState().auth.user?.id;
       const today = getTodayIsoDate();
@@ -196,10 +178,6 @@ export const upsertDailyMeal = createAsyncThunk<
       }
 
       const meal = data as DailyMeal;
-      console.log("[dailyMeal] upsertDailyMeal end", {
-        id: meal.id,
-        mealType: meal.meal_type,
-      });
       return meal;
     } catch (error) {
       console.error("[dailyMeal] upsertDailyMeal failed", error);
@@ -216,8 +194,6 @@ export const upsertDailyMeal = createAsyncThunk<
 export const deleteDailyMeal = createAsyncThunk<string, string, ThunkConfig>(
   "dailyMeal/deleteDailyMeal",
   async (id, { getState, rejectWithValue }) => {
-    console.log("[dailyMeal] deleteDailyMeal start", { id });
-
     try {
       const userId = getState().auth.user?.id;
 
@@ -235,8 +211,6 @@ export const deleteDailyMeal = createAsyncThunk<string, string, ThunkConfig>(
         console.error("[dailyMeal] deleteDailyMeal failed", error);
         return rejectWithValue(error.message);
       }
-
-      console.log("[dailyMeal] deleteDailyMeal end", { id });
       return id;
     } catch (error) {
       console.error("[dailyMeal] deleteDailyMeal failed", error);

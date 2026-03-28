@@ -25,7 +25,7 @@ const durations = [
   { label: "60+ min", value: "60_plus" as const },
 ];
 
-const StepFourScreen = () => {
+export const StepFourScreen = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { colors } = useTheme();
@@ -51,12 +51,12 @@ const StepFourScreen = () => {
       }}
       nextDisabled={nextDisabled}
     >
-      <View style={{ gap: 24 }}>
+      <View className="gap-6">
         {/* ── Workout Type ─────────────────────────────────────────────── */}
-        <View style={{ gap: 8 }}>
+        <View className="gap-2">
           <Text
-            style={{ color: colors.textMuted }}
             className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
           >
             Workout Type
           </Text>
@@ -73,21 +73,15 @@ const StepFourScreen = () => {
                       }),
                     )
                   }
+                  className="rounded-full border-2 px-4 py-3"
                   style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderRadius: 999,
-                    borderWidth: 2,
                     borderColor: active ? colors.border : colors.borderMuted,
                     backgroundColor: active ? colors.text : "transparent",
                   }}
                 >
                   <Text
-                    style={{
-                      color: active ? colors.background : colors.text,
-                      fontSize: 13,
-                    }}
-                    className="font-dmsans-bold"
+                    className="font-dmsans-bold text-[13px]"
+                    style={{ color: active ? colors.background : colors.text }}
                   >
                     {option.label}
                   </Text>
@@ -98,10 +92,10 @@ const StepFourScreen = () => {
         </View>
 
         {/* ── Session Duration ─────────────────────────────────────────── */}
-        <View style={{ gap: 8 }}>
+        <View className="gap-2">
           <Text
-            style={{ color: colors.textMuted }}
             className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
           >
             Session Duration
           </Text>
@@ -116,21 +110,15 @@ const StepFourScreen = () => {
                       updateOnboardingData({ workoutDuration: option.value }),
                     )
                   }
+                  className="rounded-full border-2 px-4 py-3"
                   style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderRadius: 999,
-                    borderWidth: 2,
                     borderColor: active ? colors.border : colors.borderMuted,
                     backgroundColor: active ? colors.text : "transparent",
                   }}
                 >
                   <Text
-                    style={{
-                      color: active ? colors.background : colors.text,
-                      fontSize: 13,
-                    }}
-                    className="font-dmsans-bold"
+                    className="font-dmsans-bold text-[13px]"
+                    style={{ color: active ? colors.background : colors.text }}
                   >
                     {option.label}
                   </Text>
@@ -141,16 +129,16 @@ const StepFourScreen = () => {
         </View>
 
         {/* ── Days Per Week ────────────────────────────────────────────── */}
-        <View style={{ gap: 8 }}>
+        <View className="gap-2">
           <Text
-            style={{ color: colors.textMuted }}
             className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
           >
             Workout Days Per Week
           </Text>
           <View className="flex-row items-center justify-between">
-            {Array.from({ length: 7 }, (_, index) => {
-              const day = index + 1;
+            {Array.from({ length: 7 }, (_, i) => {
+              const day = i + 1;
               const active = workoutDaysPerWeek === day;
               return (
                 <Pressable
@@ -158,23 +146,15 @@ const StepFourScreen = () => {
                   onPress={() =>
                     dispatch(updateOnboardingData({ workoutDaysPerWeek: day }))
                   }
+                  className="h-11 w-11 items-center justify-center rounded-full border-2"
                   style={{
-                    height: 44,
-                    width: 44,
-                    borderRadius: 999,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderWidth: 2,
                     borderColor: active ? colors.border : colors.borderMuted,
                     backgroundColor: active ? colors.text : "transparent",
                   }}
                 >
                   <Text
-                    style={{
-                      color: active ? colors.background : colors.text,
-                      fontSize: 13,
-                    }}
-                    className="font-dmsans-bold"
+                    className="font-dmsans-bold text-[13px]"
+                    style={{ color: active ? colors.background : colors.text }}
                   >
                     {day}
                   </Text>

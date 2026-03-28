@@ -66,9 +66,11 @@ interface OnboardingState {
   currentStep: number;
   loading: boolean;
   error: string | null;
-  // 0 = idle, 1 = verifying session, 2 = uploading avatar,
-  // 3 = saving profile, 4 = generating plans, 5 = done
   progressStep: number;
+  planGenerationLoading: boolean;
+  planGenerationProgress: number;
+  planGenerationMessage: string;
+  planGenerationError: string | null;
   data: OnboardingData;
 }
 
@@ -77,6 +79,10 @@ const initialState: OnboardingState = {
   loading: false,
   error: null,
   progressStep: 0,
+  planGenerationLoading: false,
+  planGenerationProgress: 0,
+  planGenerationMessage: "",
+  planGenerationError: null,
   data: {
     avatarUri: null,
     fullName: "",
@@ -104,7 +110,7 @@ const initialState: OnboardingState = {
 };
 
 export const saveOnboardingProfile = createAsyncThunk<
-  void,
+  Record<string, unknown>,
   void,
   { state: RootState; rejectValue: string }
 >(
@@ -113,7 +119,6 @@ export const saveOnboardingProfile = createAsyncThunk<
     const state = getState();
     const { data } = state.onboarding;
 
-    // ── Phase 1: verify / refresh session ──────────────────────────────────
     dispatch(setProgressStep(1));
 
     let userId = state.auth.user?.id;
@@ -136,7 +141,13 @@ export const saveOnboardingProfile = createAsyncThunk<
     const { data: sessionData, error: sessionError } =
       await supabase.auth.getSession();
 
-    const expiresAt = sessionData?.session?.expires_at ?? 0;
+    if (sessionError || !sessionData.session) {
+      return rejectWithValue(
+        "Could not retrieve session. Please log in again.",
+      );
+    }
+
+    const expiresAt = sessionData.session.expires_at ?? 0;
     const nowInSeconds = Math.floor(Date.now() / 1000);
     const isExpiringSoon = expiresAt - nowInSeconds < 60;
 
@@ -148,7 +159,7 @@ export const saveOnboardingProfile = createAsyncThunk<
       }
       accessToken = refreshed.session.access_token;
     } else {
-      accessToken = sessionData.session!.access_token;
+      accessToken = sessionData.session.access_token;
     }
 
     const payload: Record<string, unknown> = {
@@ -178,7 +189,6 @@ export const saveOnboardingProfile = createAsyncThunk<
       updated_at: new Date().toISOString(),
     };
 
-    // ── Phase 2: upload avatar (only if one was chosen) ────────────────────
     if (data.avatarUri) {
       dispatch(setProgressStep(2));
       try {
@@ -224,38 +234,97 @@ export const saveOnboardingProfile = createAsyncThunk<
       return rejectWithValue(dbError.message);
     }
 
-    // ── Phase 4: invoke AI edge function ───────────────────────────────────
     dispatch(setProgressStep(4));
 
+    return payload;
+  },
+);
+
+export const generateWorkoutPlan = createAsyncThunk<
+  void,
+  Record<string, unknown>,
+  { state: RootState; rejectValue: string }
+>(
+  "onboarding/generateWorkoutPlan",
+  async (payload, { dispatch, rejectWithValue }) => {
+    console.log("[onboarding] generating workout plan in background...");
+
+    dispatch(
+      setPlanGenerationProgress({
+        progress: 15,
+        message: "Starting AI coach...",
+      }),
+    );
+
     try {
-      const { error: fnError } = await supabase.functions.invoke(
-        "personalized_workout_and_meal_plan",
-        { body: payload },
+      dispatch(
+        setPlanGenerationProgress({
+          progress: 30,
+          message: "Checking your secure session...",
+        }),
       );
 
-      if (fnError) {
-        let message = fnError.message ?? "Failed to generate plan.";
-        try {
-          const body = await (fnError as any).context?.json();
-          console.error("[onboarding] edge function error body", body);
-          message = body?.error ?? body?.message ?? message;
-        } catch {
-          console.error(
-            "[onboarding] edge function error (no body)",
-            fnError.message,
-          );
-        }
-        return rejectWithValue(message);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        return rejectWithValue("No active session token found.");
       }
+
+      dispatch(
+        setPlanGenerationProgress({
+          progress: 55,
+          message: "Sending your profile to the AI planner...",
+        }),
+      );
+
+      const { data, error } = await supabase.functions.invoke(
+        "generate-workout-plan",
+        {
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        },
+      );
+
+      if (error) {
+        try {
+          const body = await (error as any).context?.json?.();
+          if (body) {
+            console.error(
+              "[onboarding] workout plan generation error body",
+              body,
+            );
+            return rejectWithValue(
+              body?.error ?? body?.message ?? error.message,
+            );
+          }
+        } catch {}
+
+        console.error("[onboarding] workout plan generation failed", error);
+        return rejectWithValue(error.message);
+      }
+
+      dispatch(
+        setPlanGenerationProgress({
+          progress: 85,
+          message: "Finalizing your workout blueprint...",
+        }),
+      );
+
+      console.log("[onboarding] workout plan generation succeeded", data);
+
+      return void 0;
     } catch (error) {
-      console.error("[onboarding] fn call failed", error);
+      console.error("[onboarding] workout plan generation failed", error);
       const message =
-        error instanceof Error ? error.message : "Something went wrong";
+        error instanceof Error
+          ? error.message
+          : "Failed to generate workout plan.";
       return rejectWithValue(message);
     }
-
-    // ── Phase 5: all done ──────────────────────────────────────────────────
-    dispatch(setProgressStep(5));
   },
 );
 
@@ -278,9 +347,28 @@ const onboardingSlice = createSlice({
     setProgressStep: (state, action: PayloadAction<number>) => {
       state.progressStep = action.payload;
     },
-    resetOnboarding: () => initialState, // resets progressStep to 0 too
+    setPlanGenerationProgress: (
+      state,
+      action: PayloadAction<{ progress: number; message: string }>,
+    ) => {
+      state.planGenerationLoading = true;
+      state.planGenerationError = null;
+      state.planGenerationProgress = Math.max(
+        0,
+        Math.min(100, action.payload.progress),
+      );
+      state.planGenerationMessage = action.payload.message;
+    },
+    resetPlanGenerationState: (state) => {
+      state.planGenerationLoading = false;
+      state.planGenerationProgress = 0;
+      state.planGenerationMessage = "";
+      state.planGenerationError = null;
+    },
+    resetOnboarding: () => initialState,
   },
   extraReducers: (builder) => {
+    // ── saveOnboardingProfile ──
     builder.addCase(saveOnboardingProfile.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -289,12 +377,35 @@ const onboardingSlice = createSlice({
     builder.addCase(saveOnboardingProfile.fulfilled, (state) => {
       state.loading = false;
       state.error = null;
-      // progressStep stays at 5 so the "Done" frame shows before unmount
+      // progressStep stays at 4 so the UI can react and navigate
     });
     builder.addCase(saveOnboardingProfile.rejected, (state, action) => {
       state.loading = false;
       state.progressStep = 0;
       state.error = action.payload ?? "Failed to save onboarding profile.";
+    });
+
+    // ── generateWorkoutPlan (background — UI doesn't block on this) ──
+    builder.addCase(generateWorkoutPlan.pending, (state) => {
+      state.planGenerationLoading = true;
+      state.planGenerationError = null;
+      state.planGenerationProgress = Math.max(state.planGenerationProgress, 20);
+      if (!state.planGenerationMessage) {
+        state.planGenerationMessage = "Preparing your personalized plan...";
+      }
+    });
+    builder.addCase(generateWorkoutPlan.fulfilled, (state) => {
+      state.planGenerationLoading = false;
+      state.planGenerationError = null;
+      state.planGenerationProgress = 100;
+      state.planGenerationMessage = "Your AI workout plan is ready.";
+    });
+    builder.addCase(generateWorkoutPlan.rejected, (state, action) => {
+      state.planGenerationLoading = false;
+      state.planGenerationProgress = 100;
+      state.planGenerationError =
+        action.payload ?? "Failed to generate workout plan.";
+      state.planGenerationMessage = "We could not finish generating your plan.";
     });
   },
 });
@@ -304,6 +415,8 @@ export const {
   nextStep,
   prevStep,
   setProgressStep,
+  setPlanGenerationProgress,
+  resetPlanGenerationState,
   resetOnboarding,
 } = onboardingSlice.actions;
 export default onboardingSlice.reducer;

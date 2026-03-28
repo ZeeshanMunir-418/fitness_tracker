@@ -2,9 +2,9 @@ import OnboardingShell from "@/components/(onboarding)/onboarding-shell";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-  nextStep,
-  prevStep,
-  updateOnboardingData,
+    nextStep,
+    prevStep,
+    updateOnboardingData,
 } from "@/store/slices/onboardingSlice";
 import { Href, useRouter } from "expo-router";
 import { Clock, Moon, Sun, Sunrise } from "lucide-react-native";
@@ -42,9 +42,9 @@ const StepSevenScreen = () => {
       }}
       nextDisabled={nextDisabled}
     >
-      <View style={{ gap: 24 }}>
+      <View className="gap-6">
         {/* ── Workout Reminders ────────────────────────────────────────── */}
-        <View style={{ gap: 8 }}>
+        <View className="gap-2">
           <Text
             style={{ color: colors.textMuted }}
             className="font-dmsans text-xs uppercase tracking-widest"
@@ -52,12 +52,9 @@ const StepSevenScreen = () => {
             Workout Reminders
           </Text>
           <View
+            className="flex-row rounded-full border-2 p-1"
             style={{
-              flexDirection: "row",
-              borderRadius: 999,
-              borderWidth: 2,
               borderColor: colors.border,
-              padding: 4,
             }}
           >
             {[true, false].map((value) => {
@@ -68,21 +65,14 @@ const StepSevenScreen = () => {
                   onPress={() =>
                     dispatch(updateOnboardingData({ workoutReminders: value }))
                   }
+                  className="flex-1 items-center justify-center rounded-full py-3"
                   style={{
-                    flex: 1,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 12,
-                    borderRadius: 999,
                     backgroundColor: active ? colors.text : "transparent",
                   }}
                 >
                   <Text
-                    style={{
-                      color: active ? colors.background : colors.text,
-                      fontSize: 13,
-                    }}
-                    className="font-dmsans-bold"
+                    style={{ color: active ? colors.background : colors.text }}
+                    className="font-dmsans-bold text-[13px]"
                   >
                     {value ? "YES" : "NO"}
                   </Text>
@@ -93,7 +83,7 @@ const StepSevenScreen = () => {
         </View>
 
         {/* ── Preferred Workout Time ───────────────────────────────────── */}
-        <View style={{ gap: 8 }}>
+        <View className="gap-2">
           <Text
             style={{ color: colors.textMuted }}
             className="font-dmsans text-xs uppercase tracking-widest"
@@ -111,14 +101,8 @@ const StepSevenScreen = () => {
                       updateOnboardingData({ preferredWorkoutTime: value }),
                     )
                   }
+                  className="flex-row items-center gap-2 rounded-full border-2 px-4 py-3"
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 8,
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderRadius: 999,
-                    borderWidth: 2,
                     borderColor: active ? colors.border : colors.borderMuted,
                     backgroundColor: active ? colors.text : "transparent",
                   }}
@@ -129,11 +113,8 @@ const StepSevenScreen = () => {
                     strokeWidth={1.5}
                   />
                   <Text
-                    style={{
-                      color: active ? colors.background : colors.text,
-                      fontSize: 13,
-                    }}
-                    className="font-dmsans-bold"
+                    style={{ color: active ? colors.background : colors.text }}
+                    className="font-dmsans-bold text-[13px]"
                   >
                     {label}
                   </Text>
@@ -144,7 +125,7 @@ const StepSevenScreen = () => {
         </View>
 
         {/* ── Meal Reminders ───────────────────────────────────────────── */}
-        <View style={{ gap: 8 }}>
+        <View className="gap-2">
           <Text
             style={{ color: colors.textMuted }}
             className="font-dmsans text-xs uppercase tracking-widest"
@@ -152,12 +133,9 @@ const StepSevenScreen = () => {
             Meal Reminders
           </Text>
           <View
+            className="flex-row rounded-full border-2 p-1"
             style={{
-              flexDirection: "row",
-              borderRadius: 999,
-              borderWidth: 2,
               borderColor: colors.border,
-              padding: 4,
             }}
           >
             {[true, false].map((value) => {
@@ -168,21 +146,14 @@ const StepSevenScreen = () => {
                   onPress={() =>
                     dispatch(updateOnboardingData({ mealReminders: value }))
                   }
+                  className="flex-1 items-center justify-center rounded-full py-3"
                   style={{
-                    flex: 1,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 12,
-                    borderRadius: 999,
                     backgroundColor: active ? colors.text : "transparent",
                   }}
                 >
                   <Text
-                    style={{
-                      color: active ? colors.background : colors.text,
-                      fontSize: 13,
-                    }}
-                    className="font-dmsans-bold"
+                    style={{ color: active ? colors.background : colors.text }}
+                    className="font-dmsans-bold text-[13px]"
                   >
                     {value ? "YES" : "NO"}
                   </Text>
@@ -194,21 +165,16 @@ const StepSevenScreen = () => {
 
         {/* ── Info card ────────────────────────────────────────────────── */}
         <View
+          className="flex-row items-start gap-3 rounded-2xl border-2 p-4"
           style={{
-            borderRadius: 16,
-            borderWidth: 2,
             borderColor: colors.cardBorder,
             backgroundColor: colors.card,
-            padding: 16,
-            flexDirection: "row",
-            alignItems: "flex-start",
-            gap: 12,
           }}
         >
           <Clock size={16} color={colors.textMuted} strokeWidth={1.5} />
           <Text
-            style={{ color: colors.textMuted, flex: 1 }}
-            className="font-dmsans text-xs leading-5"
+            style={{ color: colors.textMuted }}
+            className="flex-1 font-dmsans text-xs leading-5"
           >
             Reminders are sent based on your preferred workout time. You can
             change these any time in notification settings.

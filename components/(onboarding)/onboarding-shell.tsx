@@ -8,11 +8,13 @@ import {
   Platform,
   ScrollView,
   Text,
+  UIManager,
   View,
+  findNodeHandle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { height: SCREEN_H } = Dimensions.get("window");
 
 interface OnboardingShellProps {
   step: number;
@@ -39,48 +41,74 @@ const OnboardingShell = ({
 }: OnboardingShellProps) => {
   const { colors } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
-  // Measured from the footer's onLayout — ensures the last input always
-  // scrolls above the Continue button regardless of screen size or font scale.
-  const [footerHeight, setFooterHeight] = useState(80);
+  const scrollViewNodeRef = useRef<number | null>(null);
+  const [footerHeight, setFooterHeight] = useState(88);
 
-  const progressPercent =
-    `${Math.max(0, Math.min(100, (step / totalSteps) * 100))}%` as `${number}%`;
+  const progressPercent = Math.max(0, Math.min(100, (step / totalSteps) * 100));
 
-  // Called from any TextInput inside a child via onFocus prop.
-  // Passes the input's Y position in the scroll view so we can scroll it
-  // above the keyboard (roughly the bottom 45% of the screen).
-  const handleInputFocus = (y: number) => {
-    const keyboardClearanceThreshold = SCREEN_HEIGHT * 0.45;
-    if (y > keyboardClearanceThreshold) {
-      scrollRef.current?.scrollTo({
-        y: y - SCREEN_HEIGHT * 0.25, // land the field ~25% from the top
-        animated: true,
-      });
-    }
+  // Called by any TextInput's onFocus inside a child step.
+  // We measure the focused input relative to the ScrollView and scroll it
+  // into view above the keyboard, leaving ~20% breathing room at top.
+  const handleInputFocus = (inputRef: React.RefObject<any>) => {
+    if (!inputRef?.current || !scrollRef.current) return;
+
+    const nodeHandle = findNodeHandle(scrollRef.current);
+    if (!nodeHandle) return;
+
+    // Small delay so the keyboard is already animating in before we measure
+    setTimeout(() => {
+      try {
+        UIManager.measureLayout(
+          findNodeHandle(inputRef.current)!,
+          nodeHandle,
+          () => {},
+          (_x, y, _w, h) => {
+            // Bottom of the input in scroll-view coords
+            const inputBottom = y + h;
+            // The visible area above the keyboard is roughly 55% of screen height
+            const visibleAreaBottom = SCREEN_H * 0.55;
+
+            if (inputBottom > visibleAreaBottom) {
+              scrollRef.current?.scrollTo({
+                // Land the input with ~20% padding from the top of the visible area
+                y: y - SCREEN_H * 0.2,
+                animated: true,
+              });
+            }
+          },
+        );
+      } catch {
+        // measureLayout can fail if the component unmounts mid-focus — ignore
+      }
+    }, 100);
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
+    >
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
       >
-        {/* ── Fixed header (back button + step counter + progress bar + title) */}
-        <View style={{ paddingHorizontal: 24 }}>
+        {/* ── Fixed header ──────────────────────────────────────────────── */}
+        <View className="px-6">
+          {/* Back button + step counter */}
           <View className="mt-2 flex-row items-center justify-between">
             <Button
               onPress={onBack}
               disabled={!onBack}
               variant="outline"
               size="icon"
-              className="mt-0 h-10 w-10 items-center justify-center"
+              className="h-10 w-10 items-center justify-center"
             >
               <ChevronLeft size={20} color={colors.text} strokeWidth={2.5} />
             </Button>
             <Text
-              style={{ color: colors.textMuted }}
               className="font-dmsans text-sm"
+              style={{ color: colors.textMuted }}
             >
               {step} / {totalSteps}
             </Text>
@@ -88,61 +116,69 @@ const OnboardingShell = ({
 
           {/* Progress bar */}
           <View
+            className="mt-4 h-1.5 overflow-hidden rounded-full"
             style={{ borderColor: colors.border, borderWidth: 1 }}
-            className="mt-4 h-1 overflow-hidden rounded-full"
           >
             <View
+              className="h-full"
               style={{
-                width: progressPercent,
-                height: "100%",
+                width: `${progressPercent}%`,
                 backgroundColor: colors.text,
               }}
             />
           </View>
 
+          {/* Title */}
           <Text
-            style={{ color: colors.text }}
             className="mt-6 font-dmsans-bold text-3xl uppercase tracking-tight"
+            style={{ color: colors.text }}
           >
             {title}
           </Text>
+
+          {/* Subtitle */}
           {subtitle ? (
             <Text
-              style={{ color: colors.textMuted }}
               className="mt-2 font-dmsans text-sm leading-5"
+              style={{ color: colors.textMuted }}
             >
               {subtitle}
             </Text>
           ) : null}
         </View>
 
-        {/* ── Scrollable content ──────────────────────────────────────────── */}
+        {/* ── Scrollable content ────────────────────────────────────────── */}
+        {/*
+          We pass onInputFocus down via React.cloneElement so child steps
+          can call it from any TextInput's onFocus without needing a Context.
+          Steps that have NO inputs simply ignore the prop — no extra wiring needed.
+        */}
         <ScrollView
           ref={scrollRef}
-          style={{ flex: 1 }}
+          className="flex-1"
           contentContainerStyle={{
             paddingHorizontal: 24,
             paddingTop: 24,
-            // Always clears the fixed footer button + a little breathing room
+            // Always clears the fixed footer regardless of screen size
             paddingBottom: footerHeight + 16,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          onScrollToTop={() =>
-            scrollRef.current?.scrollTo({ y: 0, animated: true })
-          }
+          // Allows the scroll view to scroll to top when the status bar is tapped
+          scrollsToTop
         >
-          <FocusAwareView onInputFocus={handleInputFocus}>
-            {children}
-          </FocusAwareView>
+          {React.Children.map(children, (child) => {
+            if (!React.isValidElement(child)) return child;
+            // Inject the focus handler — steps that don't use it just ignore it
+            return React.cloneElement(child as React.ReactElement<any>, {
+              onInputFocus: handleInputFocus,
+            });
+          })}
         </ScrollView>
 
-        {/* ── Fixed footer button ─────────────────────────────────────────── */}
+        {/* ── Fixed footer ──────────────────────────────────────────────── */}
         <View
-          style={{ paddingHorizontal: 24 }}
-          className="pb-5 pt-3"
-          // Measure the real rendered height (button + padding) so the
-          // ScrollView's paddingBottom always clears it exactly.
+          className="px-6 pb-5 pt-3"
           onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
         >
           <Button
@@ -151,11 +187,11 @@ const OnboardingShell = ({
             style={{
               backgroundColor: nextDisabled ? colors.textFaint : colors.text,
             }}
-            className="mt-0 w-full px-6 py-5"
+            className="w-full px-6 py-5"
           >
             <Text
-              style={{ color: colors.background }}
               className="font-dmsans-bold text-[15px] tracking-[1.8px]"
+              style={{ color: colors.background }}
             >
               {nextLabel}
             </Text>
@@ -163,44 +199,6 @@ const OnboardingShell = ({
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  );
-};
-
-// ── FocusAwareView ─────────────────────────────────────────────────────────
-// Wraps children and intercepts TextInput focus events via React's onFocus
-// bubbling. When a TextInput inside gains focus, we measure its Y position
-// relative to the ScrollView's coordinate space and call onInputFocus.
-
-interface FocusAwareViewProps {
-  children: React.ReactNode;
-  onInputFocus: (y: number) => void;
-}
-
-const FocusAwareView = ({ children, onInputFocus }: FocusAwareViewProps) => {
-  const containerRef = useRef<View>(null);
-
-  const handleFocus = (e: any) => {
-    const target = e.target;
-    if (!target || !containerRef.current) return;
-
-    target.measureLayout(
-      containerRef.current,
-      (_x: number, y: number, _w: number, h: number) => {
-        // Pass the bottom edge so the whole input is visible.
-        onInputFocus(y + h);
-      },
-      () => {
-        // fallback: noop
-      },
-    );
-  };
-
-  return (
-    <View ref={containerRef} onStartShouldSetResponder={() => false}>
-      <View onFocus={handleFocus} accessible={false}>
-        {children}
-      </View>
-    </View>
   );
 };
 

@@ -8,6 +8,7 @@ interface InputProps extends TextInputProps {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   error?: boolean;
+  ref?: React.RefObject<TextInput>;
 }
 
 const Input = ({
@@ -16,6 +17,7 @@ const Input = ({
   leftIcon,
   rightIcon,
   error,
+  ref,
   ...props
 }: InputProps) => {
   const { colors } = useTheme();
@@ -33,6 +35,7 @@ const Input = ({
       {leftIcon}
 
       <TextInput
+        ref={ref}
         className={`flex-1 py-4 font-dmsans text-base text-black ${className}`}
         style={{ color: colors.text }}
         placeholderTextColor={colors.textMuted}

@@ -20,6 +20,7 @@ export interface WorkoutPlanDay {
   day_number: number;
   title: string;
   description: string | null;
+  image?: string | null;
   duration_minutes: number;
   exercises_count: number;
   is_rest_day: boolean;

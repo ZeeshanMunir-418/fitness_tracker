@@ -50,7 +50,7 @@ const goalOptions = [
   },
 ];
 
-const StepTwoScreen = () => {
+export const StepTwoScreen = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { colors } = useTheme();
@@ -72,7 +72,7 @@ const StepTwoScreen = () => {
       }}
       nextDisabled={!primaryGoal}
     >
-      <View style={{ gap: 12 }}>
+      <View className="gap-3">
         {goalOptions.map(({ value, title, description, Icon }) => {
           const active = primaryGoal === value;
           return (
@@ -81,10 +81,8 @@ const StepTwoScreen = () => {
               onPress={() =>
                 dispatch(updateOnboardingData({ primaryGoal: value }))
               }
+              className="rounded-3xl border-2 p-5"
               style={{
-                borderRadius: 24,
-                borderWidth: 2,
-                padding: 20,
                 borderColor: active ? colors.border : colors.borderMuted,
                 backgroundColor: active ? colors.text : "transparent",
               }}
@@ -95,22 +93,16 @@ const StepTwoScreen = () => {
                 strokeWidth={2.2}
               />
               <Text
-                style={{
-                  color: active ? colors.background : colors.text,
-                  marginTop: 12,
-                  fontSize: 15,
-                }}
-                className="font-dmsans-bold"
+                className="mt-3 font-dmsans-bold text-[15px]"
+                style={{ color: active ? colors.background : colors.text }}
               >
                 {title}
               </Text>
               <Text
+                className="mt-1 font-dmsans text-[13px]"
                 style={{
                   color: active ? colors.background + "cc" : colors.textMuted,
-                  marginTop: 4,
-                  fontSize: 13,
                 }}
-                className="font-dmsans"
               >
                 {description}
               </Text>

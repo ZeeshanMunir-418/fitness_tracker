@@ -19,7 +19,7 @@ const dietaryOptions = [
   { label: "High Protein", value: "high_protein" as const },
 ];
 
-const StepFiveScreen = () => {
+export const StepFiveScreen = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { colors } = useTheme();
@@ -50,12 +50,12 @@ const StepFiveScreen = () => {
       }}
       nextDisabled={!dietaryPreference}
     >
-      <View style={{ gap: 24 }}>
+      <View className="gap-6">
         {/* ── Dietary Preference ───────────────────────────────────────── */}
-        <View style={{ gap: 8 }}>
+        <View className="gap-2">
           <Text
-            style={{ color: colors.textMuted }}
             className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
           >
             Dietary Preference
           </Text>
@@ -67,26 +67,18 @@ const StepFiveScreen = () => {
                   key={option.value}
                   onPress={() =>
                     dispatch(
-                      updateOnboardingData({
-                        dietaryPreference: option.value,
-                      }),
+                      updateOnboardingData({ dietaryPreference: option.value }),
                     )
                   }
+                  className="rounded-full border-2 px-4 py-3"
                   style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderRadius: 999,
-                    borderWidth: 2,
                     borderColor: active ? colors.border : colors.borderMuted,
                     backgroundColor: active ? colors.text : "transparent",
                   }}
                 >
                   <Text
-                    style={{
-                      color: active ? colors.background : colors.text,
-                      fontSize: 13,
-                    }}
-                    className="font-dmsans-bold"
+                    className="font-dmsans-bold text-[13px]"
+                    style={{ color: active ? colors.background : colors.text }}
                   >
                     {option.label}
                   </Text>
@@ -98,92 +90,68 @@ const StepFiveScreen = () => {
 
         {/* ── Daily Water Goal ─────────────────────────────────────────── */}
         <View
-          style={{
-            borderRadius: 24,
-            borderWidth: 2,
-            borderColor: colors.border,
-            padding: 20,
-            gap: 12,
-          }}
+          className="gap-3 rounded-3xl border-2 p-5"
+          style={{ borderColor: colors.border }}
         >
           <Text
-            style={{ color: colors.text }}
             className="font-dmsans-bold text-base"
+            style={{ color: colors.text }}
           >
             Daily Water Goal
           </Text>
           <View className="flex-row items-center justify-between">
             <Pressable
               onPress={() => adjustWater(-0.25)}
-              style={{
-                height: 48,
-                width: 48,
-                borderRadius: 999,
-                borderWidth: 2,
-                borderColor: colors.border,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className="h-12 w-12 items-center justify-center rounded-full border-2"
+              style={{ borderColor: colors.border }}
             >
               <Text
-                style={{ color: colors.text }}
                 className="font-dmsans-bold text-xl"
+                style={{ color: colors.text }}
               >
                 −
               </Text>
             </Pressable>
             <Text
-              style={{ color: colors.text }}
               className="font-dmsans-bold text-2xl"
+              style={{ color: colors.text }}
             >
               {dailyWaterGoalLiters.toFixed(2)}L
             </Text>
             <Pressable
               onPress={() => adjustWater(0.25)}
-              style={{
-                height: 48,
-                width: 48,
-                borderRadius: 999,
-                borderWidth: 2,
-                borderColor: colors.border,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className="h-12 w-12 items-center justify-center rounded-full border-2"
+              style={{ borderColor: colors.border }}
             >
               <Text
-                style={{ color: colors.text }}
                 className="font-dmsans-bold text-xl"
+                style={{ color: colors.text }}
               >
                 +
               </Text>
             </Pressable>
           </View>
           <Text
+            className="text-center font-dmsans text-xs"
             style={{ color: colors.textMuted }}
-            className="font-dmsans text-xs text-center"
           >
             Range: 0.5L to 5L (0.25L increments)
           </Text>
         </View>
 
         {/* ── Track Calories ───────────────────────────────────────────── */}
-        <View style={{ gap: 8 }}>
+        <View className="gap-2">
           <Text
-            style={{ color: colors.textMuted }}
             className="font-dmsans text-xs uppercase tracking-widest"
+            style={{ color: colors.textMuted }}
           >
             Track Calories
           </Text>
           <View
-            style={{
-              flexDirection: "row",
-              borderRadius: 999,
-              borderWidth: 2,
-              borderColor: colors.border,
-              padding: 4,
-            }}
+            className="flex-row rounded-full border-2 p-1"
+            style={{ borderColor: colors.border }}
           >
-            {[true, false].map((value) => {
+            {([true, false] as const).map((value) => {
               const active = tracksCalories === value;
               return (
                 <Pressable
@@ -191,21 +159,14 @@ const StepFiveScreen = () => {
                   onPress={() =>
                     dispatch(updateOnboardingData({ tracksCalories: value }))
                   }
+                  className="flex-1 items-center justify-center rounded-full py-3"
                   style={{
-                    flex: 1,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 12,
-                    borderRadius: 999,
                     backgroundColor: active ? colors.text : "transparent",
                   }}
                 >
                   <Text
-                    style={{
-                      color: active ? colors.background : colors.text,
-                      fontSize: 13,
-                    }}
-                    className="font-dmsans-bold"
+                    className="font-dmsans-bold text-[13px]"
+                    style={{ color: active ? colors.background : colors.text }}
                   >
                     {value ? "YES" : "NO"}
                   </Text>

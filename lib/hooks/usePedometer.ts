@@ -1,10 +1,14 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef, useState } from "react";
 import {
+  getTodayIso,
   readBaseline,
   readStepsFromStorage,
   saveBaseline,
   saveStepsToStorage,
 } from "../stepCounter";
+
+const STEPS_DATE_KEY = "apex_steps_date";
 
 interface PedometerState {
   steps: number;
@@ -28,7 +32,7 @@ export const usePedometer = (): PedometerState => {
       try {
         const { Pedometer } = await import("expo-sensors");
 
-        // Immediately show persisted steps from last session
+        // Show persisted steps from last session immediately
         const persisted = await readStepsFromStorage();
         if (isMounted) setSteps(persisted);
 
@@ -36,7 +40,6 @@ export const usePedometer = (): PedometerState => {
         if (!isMounted) return;
 
         if (!isAvailable) {
-          console.log("[pedometer] not available on this device");
           setAvailable(false);
           return;
         }
@@ -48,14 +51,13 @@ export const usePedometer = (): PedometerState => {
         if (!isMounted) return;
 
         if (!permissionGranted) {
-          console.log("[pedometer] permission denied");
           setGranted(false);
           return;
         }
 
         setGranted(true);
 
-        // Get historical steps since midnight
+        // Get steps since midnight
         const now = new Date();
         const startOfToday = new Date(
           now.getFullYear(),
@@ -69,15 +71,19 @@ export const usePedometer = (): PedometerState => {
         try {
           const past = await Pedometer.getStepCountAsync(startOfToday, now);
           const hardwareSteps = past.steps;
-          console.log(
-            "[pedometer] hardware steps since midnight:",
-            hardwareSteps,
-          );
+
+          // Check if it's a new day — baseline must be reset
+          const savedDate = await AsyncStorage.getItem(STEPS_DATE_KEY);
+          const today = getTodayIso();
+          const isNewDay = savedDate !== today;
 
           let baseline = await readBaseline();
-          if (!baseline) {
-            await saveBaseline(hardwareSteps);
-            baseline = hardwareSteps;
+
+          if (baseline === null || isNewDay) {
+            // getStepCountAsync already returns steps since midnight,
+            // so the baseline offset should be 0 — not the raw hardware count.
+            await saveBaseline(0, true);
+            baseline = 0;
           }
 
           baselineRef.current = baseline;
@@ -97,13 +103,8 @@ export const usePedometer = (): PedometerState => {
         subscription = Pedometer.watchStepCount(async (result) => {
           if (!isMounted) return;
 
-          const baseline = baselineRef.current;
-          const todaySteps =
-            baseline !== null
-              ? Math.max(0, result.steps - baseline)
-              : result.steps;
-
-          console.log("[pedometer] live update:", todaySteps);
+          const baseline = baselineRef.current ?? 0;
+          const todaySteps = Math.max(0, result.steps - baseline);
           setSteps(todaySteps);
           await saveStepsToStorage(todaySteps);
         });

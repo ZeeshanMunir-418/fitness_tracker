@@ -6,7 +6,7 @@ import React from "react";
 import { Image, Text, View } from "react-native";
 
 export interface Workout {
-  id: number;
+  id: string;
   title: string;
   image: number;
   duration: string;
@@ -59,7 +59,13 @@ const WorkoutCard = ({
             </Text>
           </View>
         </View>
-        <Link href="/workouts" asChild>
+        <Link
+          href={{
+            pathname: "/workouts/[id]",
+            params: { id },
+          }}
+          asChild
+        >
           <Button>
             <Text className="text-white font-dmsans text-base">Start Now</Text>
           </Button>

@@ -90,7 +90,7 @@ const getNotificationsModule =
       cachedNotificationsModule = notificationsModule;
       return notificationsModule;
     } catch (error) {
-      console.log("[notifications] expo-notifications import failed", error);
+      console.error("[notifications] expo-notifications import failed", error);
       return null;
     }
   };
@@ -135,20 +135,18 @@ const getIsPhysicalDevice = async (): Promise<boolean> => {
     const deviceModule = await import("expo-device");
     return Boolean(deviceModule.isDevice);
   } catch (error) {
-    console.log("[notifications] expo-device import failed", error);
+    console.error("[notifications] expo-device import failed", error);
     return Boolean(Constants.isDevice);
   }
 };
 
 export const requestNotificationPermission = async (): Promise<boolean> => {
-  console.log("[notifications] requestNotificationPermission start");
-
   await ensureNotificationHandlerConfigured();
 
   const isPhysicalDevice = await getIsPhysicalDevice();
 
   if (!isPhysicalDevice) {
-    console.log("[notifications] requestNotificationPermission end", {
+    console.error("[notifications] requestNotificationPermission end", {
       granted: false,
       reason: "not_a_physical_device",
     });
@@ -158,7 +156,7 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   const notifications = await getNotificationsModule();
 
   if (!notifications) {
-    console.log("[notifications] requestNotificationPermission end", {
+    console.error("[notifications] requestNotificationPermission end", {
       granted: false,
       reason: "expo_notifications_module_missing",
     });
@@ -166,7 +164,7 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   }
 
   if (typeof notifications.requestPermissionsAsync !== "function") {
-    console.log("[notifications] requestNotificationPermission end", {
+    console.error("[notifications] requestNotificationPermission end", {
       granted: false,
       reason: "request_permissions_unavailable",
     });
@@ -189,19 +187,15 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
       lightColor: "#FF231F7C",
     });
   }
-
-  console.log("[notifications] requestNotificationPermission end", { granted });
   return granted;
 };
 
 export const getExpoPushToken = async (): Promise<string | null> => {
-  console.log("[notifications] getExpoPushToken start");
-
   try {
     const notifications = await getNotificationsModule();
 
     if (!notifications) {
-      console.log("[notifications] getExpoPushToken end", {
+      console.error("[notifications] getExpoPushToken end", {
         success: false,
         reason: "expo_notifications_module_missing",
       });
@@ -209,7 +203,7 @@ export const getExpoPushToken = async (): Promise<string | null> => {
     }
 
     if (typeof notifications.getExpoPushTokenAsync !== "function") {
-      console.log("[notifications] getExpoPushToken end", {
+      console.error("[notifications] getExpoPushToken end", {
         success: false,
         reason: "get_expo_push_token_unavailable",
       });
@@ -221,9 +215,6 @@ export const getExpoPushToken = async (): Promise<string | null> => {
       Constants.easConfig?.projectId;
 
     const token = await notifications.getExpoPushTokenAsync({ projectId });
-
-    console.log("[notifications] token", token.data);
-    console.log("[notifications] getExpoPushToken end", { success: true });
     return token.data;
   } catch (error) {
     console.error("[notifications] getExpoPushToken failed", error);
@@ -235,8 +226,6 @@ export const saveExpoPushTokenToSupabase = async (
   userId: string,
   token: string,
 ): Promise<void> => {
-  console.log("[notifications] saveExpoPushTokenToSupabase start", { userId });
-
   const { error } = await supabase
     .from("profiles")
     .update({ expo_push_token: token, updated_at: new Date().toISOString() })
@@ -246,13 +235,9 @@ export const saveExpoPushTokenToSupabase = async (
     console.error("[notifications] saveExpoPushTokenToSupabase failed", error);
     return;
   }
-
-  console.log("[notifications] saveExpoPushTokenToSupabase end", { userId });
 };
 
 export const setupNotificationListeners = (router: Router): (() => void) => {
-  console.log("[notifications] setupNotificationListeners start");
-
   let isUnmounted = false;
   let receivedSubscription: {
     remove: () => void;
@@ -282,8 +267,6 @@ export const setupNotificationListeners = (router: Router): (() => void) => {
 
     receivedSubscription = notifications.addNotificationReceivedListener(
       (notification: unknown) => {
-        console.log("[notifications] notification received", notification);
-
         const maybeNotification = notification as {
           request?: {
             content?: { title?: unknown; body?: unknown; data?: unknown };
@@ -309,8 +292,6 @@ export const setupNotificationListeners = (router: Router): (() => void) => {
     responseSubscription =
       notifications.addNotificationResponseReceivedListener(
         (response: unknown) => {
-          console.log("[notifications] notification response", response);
-
           const maybeResponse = response as {
             notification?: {
               request?: {
@@ -347,27 +328,15 @@ export const scheduleLocalNotification = async (
   body: string,
   data?: Record<string, string>,
 ): Promise<void> => {
-  console.log("[notifications] scheduleLocalNotification start", { title });
-
   await ensureNotificationHandlerConfigured();
 
   const notifications = await getNotificationsModule();
 
   if (!notifications) {
-    console.log("[notifications] scheduleLocalNotification end", {
-      title,
-      skipped: true,
-      reason: "expo_notifications_module_missing",
-    });
     return;
   }
 
   if (typeof notifications.scheduleNotificationAsync !== "function") {
-    console.log("[notifications] scheduleLocalNotification end", {
-      title,
-      skipped: true,
-      reason: "schedule_notification_unavailable",
-    });
     return;
   }
 
@@ -379,6 +348,4 @@ export const scheduleLocalNotification = async (
     },
     trigger: null,
   });
-
-  console.log("[notifications] scheduleLocalNotification end", { title });
 };

@@ -57,7 +57,6 @@ export const CalorieRing: React.FC<CalorieRingProps> = ({
         />
       </Svg>
 
-      {/* Center labels */}
       <View className="absolute items-center justify-center">
         <Text
           className="text-6xl font-dmsans-bold text-black -tracking-tight"

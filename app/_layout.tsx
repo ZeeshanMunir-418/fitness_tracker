@@ -15,6 +15,7 @@ import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
 import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Loader2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import "react-native-reanimated";
@@ -201,11 +202,10 @@ function AppNavigator() {
   const inOnboardingGroup = rootSegment === "(onboarding)";
   const inTabsGroup = rootSegment === "(tabs)";
   const inWorkouts = rootSegment === "workouts";
+  const inScan = rootSegment === "scan";
   const inProfile = rootSegment === "(profile)";
   const inNotifications = rootSegment === "(notifications)";
   const inAuthCallback = rootSegment === "auth";
-  const inProtectedArea =
-    inTabsGroup || inWorkouts || inProfile || inNotifications;
 
   useEffect(() => {
     setIsMounted(true);
@@ -327,20 +327,24 @@ function AppNavigator() {
     let isEffectActive = true;
 
     const checkOnboarding = async () => {
-      if (inProtectedArea) return;
       const cached = await getCachedOnboardingCompleted(authSession.user.id);
+
+      const routeFromCached = async () => {
+        if (cached === false) {
+          if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
+          return;
+        }
+
+        if (cached === true) {
+          if (inOnboardingGroup || inAuthGroup) router.replace("/(tabs)");
+          return;
+        }
+
+        if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
+      };
 
       if (!isEffectActive) return;
 
-      if (cached === false) {
-        if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
-        return;
-      }
-
-      if (cached === true) {
-        if (!inOnboardingGroup) router.replace("/(tabs)");
-        return;
-      }
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("onboarding_completed")
@@ -349,7 +353,32 @@ function AppNavigator() {
 
       if (!isEffectActive) return;
 
-      if (error || !profile?.onboarding_completed) {
+      if (error) {
+        const errorCode = String((error as any)?.code ?? "");
+        const errorMessage = String(
+          (error as any)?.message ?? "",
+        ).toLowerCase();
+        const errorDetails = String(
+          (error as any)?.details ?? "",
+        ).toLowerCase();
+
+        // When the profile row is deleted/missing, force onboarding instead of trusting stale cache.
+        const isMissingProfileRow =
+          errorCode === "PGRST116" ||
+          errorMessage.includes("no rows") ||
+          errorDetails.includes("0 rows");
+
+        if (isMissingProfileRow) {
+          await setCachedOnboardingCompleted(authSession.user.id, false);
+          if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
+          return;
+        }
+
+        await routeFromCached();
+        return;
+      }
+
+      if (!profile?.onboarding_completed) {
         await setCachedOnboardingCompleted(authSession.user.id, false);
         if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
         return;
@@ -357,7 +386,9 @@ function AppNavigator() {
 
       await setCachedOnboardingCompleted(authSession.user.id, true);
 
-      if (!inOnboardingGroup) {
+      // Only redirect to tabs from auth/onboarding entry points.
+      // Do not hijack valid protected routes like /scan or /workouts.
+      if (inOnboardingGroup || inAuthGroup) {
         router.replace("/(tabs)");
       }
     };
@@ -375,14 +406,13 @@ function AppNavigator() {
     rootSegment,
     inAuthGroup,
     inOnboardingGroup,
-    inProtectedArea,
     inAuthCallback,
   ]);
 
   if (!initialized && !inAuthCallback) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: colors.textMuted }}>Initializing session...</Text>
+        <Loader2 size={24} color={colors.text} className="animate-spin" />
       </View>
     );
   }
@@ -397,6 +427,7 @@ function AppNavigator() {
         <Stack.Screen name="(profile)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="workouts" options={{ headerShown: false }} />
+        <Stack.Screen name="scan" options={{ headerShown: false }} />
       </Stack>
 
       <Modal

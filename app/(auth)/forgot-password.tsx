@@ -3,11 +3,10 @@ import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
-import { ArrowLeft, CheckCircle, Mail } from "lucide-react-native";
+import { ArrowLeft, CheckCircle, Mail, Loader2 } from "lucide-react-native";
 import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
-  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -48,7 +47,7 @@ const ForgotPasswordScreen = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: "fitnesstracker://auth/callback?type=recovery",
+        redirectTo: process.env.EXPO_PUBLIC_CALLBACK_URL + "password-reset",
       });
 
       if (error) {
@@ -262,7 +261,7 @@ const ForgotPasswordScreen = () => {
                 }}
               >
                 {loading ? (
-                  <ActivityIndicator color={colors.background} />
+                  <Loader2 color={colors.background} className='animate-spin'/>
                 ) : (
                   <Text
                     style={{ color: colors.background }}
