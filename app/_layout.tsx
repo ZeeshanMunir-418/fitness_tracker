@@ -12,7 +12,8 @@ import { loadTheme } from "@/store/slices/themeSlice";
 import { DMSans_400Regular, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments } from "expo-router";
+import * as Linking from "expo-linking";
+import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
@@ -23,7 +24,6 @@ import "../globals.css";
 const onboardingCacheKey = (userId: string) =>
   `apex_onboarding_completed_${userId}`;
 
-// All three helpers are async — always await them.
 const getCachedOnboardingCompleted = async (
   userId: string,
 ): Promise<boolean | null> => {
@@ -46,27 +46,202 @@ const setCachedOnboardingCompleted = async (
   } catch {}
 };
 
-// Call this from step-8 after onboarding completes so the guard
-// never hits Supabase again for this user.
 export const warmOnboardingCache = async (userId: string): Promise<void> => {
   await setCachedOnboardingCompleted(userId, true);
 };
 
 export const unstable_settings = {
-  anchor: "(tabs)",
+  anchor: "(auth)",
+};
+
+const resolveAuthUrlFromIncoming = (incomingUrl: string): string | null => {
+  let current = incomingUrl;
+
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (
+      current.includes("auth/callback") ||
+      current.includes("/auth/v1/verify")
+    ) {
+      return current;
+    }
+
+    const parsed = Linking.parse(current);
+    const nestedUrl = parsed.queryParams?.url;
+
+    if (typeof nestedUrl !== "string" || nestedUrl.length === 0) {
+      break;
+    }
+
+    const decoded = decodeURIComponent(nestedUrl);
+    if (!decoded || decoded === current) {
+      break;
+    }
+
+    current = decoded;
+  }
+
+  return null;
+};
+
+const getParam = (
+  params: Record<string, string | string[] | undefined>,
+  key: string,
+): string | null => {
+  const value = params[key];
+  if (typeof value === "string" && value.length > 0) return value;
+  if (
+    Array.isArray(value) &&
+    typeof value[0] === "string" &&
+    value[0].length > 0
+  )
+    return value[0];
+  return null;
+};
+
+const getFragmentParams = (url: string): URLSearchParams => {
+  const hashIndex = url.indexOf("#");
+  if (hashIndex === -1) return new URLSearchParams();
+  return new URLSearchParams(url.slice(hashIndex + 1));
+};
+
+const processAuthCallbackUrl = async (
+  source: "initial" | "listener",
+  incomingUrl: string,
+): Promise<void> => {
+  const resolvedUrl = resolveAuthUrlFromIncoming(incomingUrl);
+
+  console.log("[auth-link] received", {
+    source,
+    incomingUrl,
+    resolvedUrl,
+  });
+
+  if (!resolvedUrl) {
+    console.log("[auth-link] ignored non-callback URL", { source });
+    return;
+  }
+
+  const parsed = Linking.parse(resolvedUrl);
+  const query = parsed.queryParams ?? {};
+  const fragment = getFragmentParams(resolvedUrl);
+
+  const token = getParam(query, "token");
+  const type = getParam(query, "type") ?? "signup";
+  const accessToken =
+    getParam(query, "access_token") ?? fragment.get("access_token");
+  const refreshToken =
+    getParam(query, "refresh_token") ?? fragment.get("refresh_token");
+  const code = getParam(query, "code");
+
+  if (accessToken && refreshToken) {
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (error) {
+      console.error("[auth-link] setSession failed", {
+        source,
+        message: error.message,
+      });
+    } else {
+      console.log("[auth-link] setSession succeeded", { source });
+    }
+    return;
+  }
+
+  if (token) {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: type as any,
+    });
+
+    if (error) {
+      console.error("[auth-link] verifyOtp failed", {
+        source,
+        message: error.message,
+      });
+    } else {
+      console.log("[auth-link] verifyOtp succeeded", { source });
+    }
+    return;
+  }
+
+  if (!code && !resolvedUrl.includes("auth/callback")) {
+    console.log("[auth-link] no auth payload found", {
+      source,
+      resolvedUrl,
+    });
+    return;
+  }
+
+  const { error } = await supabase.auth.exchangeCodeForSession(resolvedUrl);
+
+  if (error) {
+    console.error("[auth-link] exchange failed", {
+      source,
+      message: error.message,
+    });
+  } else {
+    console.log("[auth-link] exchange succeeded", { source });
+  }
 };
 
 function AppNavigator() {
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const pathname = usePathname();
   const segments = useSegments();
-  const { session, initialized } = useAppSelector((s) => s.auth);
+  const { session: authSession, initialized } = useAppSelector((s) => s.auth);
   const { isDark, colors } = useTheme();
   const [isOfflineAlertVisible, setIsOfflineAlertVisible] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const rootSegment = segments[0] as string | undefined;
+  const inAuthGroup = rootSegment === "(auth)";
+  const inOnboardingGroup = rootSegment === "(onboarding)";
+  const inTabsGroup = rootSegment === "(tabs)";
+  const inWorkouts = rootSegment === "workouts";
+  const inProfile = rootSegment === "(profile)";
+  const inNotifications = rootSegment === "(notifications)";
+  const inAuthCallback = rootSegment === "auth";
+  const inProtectedArea =
+    inTabsGroup || inWorkouts || inProfile || inNotifications;
 
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const segmentText = segments.length ? segments.join("/") : "(root)";
+    console.log("[nav] render", {
+      pathname,
+      segment: segmentText,
+      rootSegment,
+      initialized,
+      hasSession: Boolean(authSession),
+      userId: authSession?.user?.id ?? null,
+    });
+  }, [pathname, segments, rootSegment, initialized, authSession]);
+
+  useEffect(() => {
+    Linking.getInitialURL()
+      .then((initialUrl) => {
+        console.log("[auth-link] initial URL", { url: initialUrl });
+        if (initialUrl) {
+          void processAuthCallbackUrl("initial", initialUrl);
+        }
+      })
+      .catch((error) => {
+        console.error("[auth-link] failed to read initial URL", {
+          message: String(error),
+        });
+      });
+
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      void processAuthCallbackUrl("listener", url);
+    });
+
+    return () => sub.remove();
   }, []);
 
   const checkInternetConnection = useCallback(async () => {
@@ -137,51 +312,23 @@ function AppNavigator() {
     return () => subscription.unsubscribe();
   }, [dispatch]);
 
-  // ── Navigation guard ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!initialized) return;
     if (!isMounted) return;
 
-    const rootSegment = segments[0] as string | undefined;
-    const inAuthGroup = rootSegment === "(auth)";
-    const inOnboardingGroup = rootSegment === "(onboarding)";
-    const inTabsGroup = rootSegment === "(tabs)";
-    const inWorkouts = rootSegment === "workouts";
-    const inProfile = rootSegment === "(profile)";
-    const inNotifications = rootSegment === "(notifications)";
-    const inAuthCallback = rootSegment === "auth";
+    if (!authSession) {
+      if (inAuthGroup || inAuthCallback) return;
+      if (rootSegment === undefined) return;
 
-    const inProtectedArea =
-      inTabsGroup || inWorkouts || inProfile || inNotifications;
-
-    // ── Not logged in ────────────────────────────────────────────────────────
-    if (!session) {
-      if (
-        inAuthGroup ||
-        inAuthCallback ||
-        rootSegment === undefined ||
-        rootSegment === "index"
-      ) {
-        return;
-      }
-      router.replace("/");
+      router.replace("/login");
       return;
     }
 
-    // ── Logged in ────────────────────────────────────────────────────────────
     let isEffectActive = true;
 
     const checkOnboarding = async () => {
-      // ✅ Already in a protected route — never redirect backwards.
-      // This is the critical guard that prevents the post-onboarding flash:
-      // when resetOnboarding() fires 500ms after router.replace("/(tabs)"),
-      // segments[0] is already "(tabs)" so we bail out immediately here.
       if (inProtectedArea) return;
-
-      // ✅ Await the async cache read — without await, cached is a Promise
-      // object which is never === true/false/null, causing a Supabase fetch
-      // on every single guard invocation and breaking cache entirely.
-      const cached = await getCachedOnboardingCompleted(session.user.id);
+      const cached = await getCachedOnboardingCompleted(authSession.user.id);
 
       if (!isEffectActive) return;
 
@@ -191,28 +338,24 @@ function AppNavigator() {
       }
 
       if (cached === true) {
-        // Cache says done — go to tabs if not already heading there
         if (!inOnboardingGroup) router.replace("/(tabs)");
         return;
       }
-
-      // ── Cache miss: ask Supabase (only happens once per install) ───────────
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("onboarding_completed")
-        .eq("id", session.user.id)
+        .eq("id", authSession.user.id)
         .single();
 
       if (!isEffectActive) return;
 
       if (error || !profile?.onboarding_completed) {
-        await setCachedOnboardingCompleted(session.user.id, false);
+        await setCachedOnboardingCompleted(authSession.user.id, false);
         if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
         return;
       }
 
-      // Warm the cache so we never hit Supabase again
-      await setCachedOnboardingCompleted(session.user.id, true);
+      await setCachedOnboardingCompleted(authSession.user.id, true);
 
       if (!inOnboardingGroup) {
         router.replace("/(tabs)");
@@ -224,12 +367,29 @@ function AppNavigator() {
     return () => {
       isEffectActive = false;
     };
-  }, [initialized, isMounted, session, router, segments]);
+  }, [
+    initialized,
+    isMounted,
+    authSession,
+    router,
+    rootSegment,
+    inAuthGroup,
+    inOnboardingGroup,
+    inProtectedArea,
+    inAuthCallback,
+  ]);
+
+  if (!initialized && !inAuthCallback) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: colors.textMuted }}>Initializing session...</Text>
+      </View>
+    );
+  }
 
   return (
     <>
       <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />

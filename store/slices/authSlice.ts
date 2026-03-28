@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { Session, User } from "@supabase/supabase-js";
+import * as AuthSession from "expo-auth-session";
 import Constants from "expo-constants";
 
 type GoogleSigninModule =
@@ -109,7 +110,18 @@ export const signUp = createAsyncThunk(
     { email, password }: { email: string; password: string },
     { rejectWithValue },
   ) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const redirectTo = AuthSession.makeRedirectUri({
+      scheme: "fitnesstracker",
+      path: "auth/callback",
+    });
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectTo,
+      },
+    });
     if (error) return rejectWithValue(error.message);
     return data;
   },
@@ -126,6 +138,9 @@ export const signOut = createAsyncThunk(
       await GoogleSignin.signOut();
     } catch {
       // Ignore Google SDK sign-out failures after Supabase session has been cleared.
+      console.error(
+        "Failed to sign out from Google SDK. This may require a development build and does not affect Supabase session state.",
+      );
     }
   },
 );
