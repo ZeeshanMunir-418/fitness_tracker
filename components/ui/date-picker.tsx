@@ -33,7 +33,6 @@ export function CustomDatePicker({
     }
   };
 
-  // ANDROID → native dialog only
   if (Platform.OS === "android") {
     return visible ? (
       <DateTimePicker
@@ -47,12 +46,12 @@ export function CustomDatePicker({
     ) : null;
   }
 
-  // IOS → custom modal
   return (
     <Modal transparent animationType="fade" visible={visible}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="rounded-t-3xl bg-white p-6">
           <DateTimePicker
+            textColor={Platform.OS === "ios" ? "black" : undefined}
             value={tempDate}
             mode="date"
             display="spinner"

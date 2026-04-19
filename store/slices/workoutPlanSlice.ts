@@ -3,7 +3,9 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { RootState } from "../index";
 
 export interface WorkoutExercise {
+  exerciseDbId: string; // ExerciseDB exercise ID
   name: string;
+  gifUrl: string; // ExerciseDB GIF URL
   sets: number;
   reps: string;
   restSeconds: number;
@@ -20,7 +22,6 @@ export interface WorkoutPlanDay {
   day_number: number;
   title: string;
   description: string | null;
-  image?: string | null;
   duration_minutes: number;
   exercises_count: number;
   is_rest_day: boolean;
@@ -61,9 +62,8 @@ const getTodayDayNumber = () => {
   return today === 0 ? 7 : today;
 };
 
-/**
- * Fetches active home and gym workout plans with nested plan days for the current user.
- */
+// ── Fetch all active plans (home + gym) with all 7 days ────────────────────────
+
 export const fetchActivePlans = createAsyncThunk<
   {
     homePlan: WorkoutPlan | null;
@@ -73,57 +73,41 @@ export const fetchActivePlans = createAsyncThunk<
   void,
   ThunkConfig
 >("workoutPlan/fetchActivePlans", async (_, { getState, rejectWithValue }) => {
-  console.log("[workoutPlan] fetchActivePlans start");
+  const userId = getState().auth.user?.id;
+  if (!userId) return rejectWithValue("User is not authenticated.");
 
-  try {
-    const userId = getState().auth.user?.id;
+  const { data, error } = await supabase
+    .from("workout_plans")
+    .select("*, workout_plan_days(*)")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("generated_at", { ascending: false });
 
-    if (!userId) {
-      throw new Error("User is not authenticated.");
-    }
-
-    const { data, error } = await supabase
-      .from("workout_plans")
-      .select("*, workout_plan_days(*)")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .order("generated_at", { ascending: false });
-
-    if (error) {
-      console.error("[workoutPlan] fetchActivePlans failed", error);
-      return rejectWithValue(error.message);
-    }
-
-    const plans = (data ?? []) as WorkoutPlan[];
-    const homePlan = plans.find((plan) => plan.plan_type === "home") ?? null;
-    const gymPlan = plans.find((plan) => plan.plan_type === "gym") ?? null;
-
-    const homeDays = homePlan?.workout_plan_days ?? [];
-    const gymDays = gymPlan?.workout_plan_days ?? [];
-    const days = [...homeDays, ...gymDays].sort(
-      (left, right) => left.day_number - right.day_number,
-    );
-
-    console.log("[workoutPlan] fetchActivePlans end", {
-      homePlan: Boolean(homePlan),
-      gymPlan: Boolean(gymPlan),
-      daysCount: days.length,
-    });
-
-    return { homePlan, gymPlan, days };
-  } catch (error) {
+  if (error) {
     console.error("[workoutPlan] fetchActivePlans failed", error);
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to fetch active workout plans.";
-    return rejectWithValue(message);
+    return rejectWithValue(error.message);
   }
+
+  const plans = (data ?? []) as WorkoutPlan[];
+  const homePlan = plans.find((p) => p.plan_type === "home") ?? null;
+  const gymPlan = plans.find((p) => p.plan_type === "gym") ?? null;
+
+  const days = [
+    ...(homePlan?.workout_plan_days ?? []),
+    ...(gymPlan?.workout_plan_days ?? []),
+  ].sort((a, b) => a.day_number - b.day_number);
+
+  console.log("[workoutPlan] fetchActivePlans done", {
+    homePlan: Boolean(homePlan),
+    gymPlan: Boolean(gymPlan),
+    days: days.length,
+  });
+
+  return { homePlan, gymPlan, days };
 });
 
-/**
- * Fetches only today's workout plan days from active home and gym plans for the current user.
- */
+// ── Fetch today's workout only ─────────────────────────────────────────────────
+
 export const fetchTodayWorkout = createAsyncThunk<
   {
     homePlan: WorkoutPlan | null;
@@ -133,73 +117,54 @@ export const fetchTodayWorkout = createAsyncThunk<
   void,
   ThunkConfig
 >("workoutPlan/fetchTodayWorkout", async (_, { getState, rejectWithValue }) => {
-  console.log("[workoutPlan] fetchTodayWorkout start");
+  const userId = getState().auth.user?.id;
+  if (!userId) return rejectWithValue("User is not authenticated.");
 
-  try {
-    const userId = getState().auth.user?.id;
+  const dayNumber = getTodayDayNumber();
 
-    if (!userId) {
-      throw new Error("User is not authenticated.");
-    }
+  const { data, error } = await supabase
+    .from("workout_plans")
+    .select("*, workout_plan_days(*)")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("generated_at", { ascending: false });
 
-    const dayNumber = getTodayDayNumber();
-
-    const { data, error } = await supabase
-      .from("workout_plans")
-      .select("*, workout_plan_days(*)")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .order("generated_at", { ascending: false });
-
-    if (error) {
-      console.error("[workoutPlan] fetchTodayWorkout failed", error);
-      return rejectWithValue(error.message);
-    }
-
-    const plans = (data ?? []) as WorkoutPlan[];
-    const homePlan = plans.find((plan) => plan.plan_type === "home") ?? null;
-    const gymPlan = plans.find((plan) => plan.plan_type === "gym") ?? null;
-
-    const homeTodayDays = (homePlan?.workout_plan_days ?? []).filter(
-      (day) => day.day_number === dayNumber,
-    );
-    const gymTodayDays = (gymPlan?.workout_plan_days ?? []).filter(
-      (day) => day.day_number === dayNumber,
-    );
-
-    const days = [...homeTodayDays, ...gymTodayDays].sort(
-      (left, right) => left.day_number - right.day_number,
-    );
-
-    console.log("[workoutPlan] fetchTodayWorkout end", {
-      dayNumber,
-      daysCount: days.length,
-    });
-
-    return { homePlan, gymPlan, days };
-  } catch (error) {
+  if (error) {
     console.error("[workoutPlan] fetchTodayWorkout failed", error);
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to fetch today's workout.";
-    return rejectWithValue(message);
+    return rejectWithValue(error.message);
   }
+
+  const plans = (data ?? []) as WorkoutPlan[];
+  const homePlan = plans.find((p) => p.plan_type === "home") ?? null;
+  const gymPlan = plans.find((p) => p.plan_type === "gym") ?? null;
+
+  const days = [
+    ...(homePlan?.workout_plan_days ?? []).filter(
+      (d) => d.day_number === dayNumber,
+    ),
+    ...(gymPlan?.workout_plan_days ?? []).filter(
+      (d) => d.day_number === dayNumber,
+    ),
+  ].sort((a, b) => a.day_number - b.day_number);
+
+  console.log("[workoutPlan] fetchTodayWorkout done", {
+    dayNumber,
+    days: days.length,
+  });
+
+  return { homePlan, gymPlan, days };
 });
+
+// ── Slice ──────────────────────────────────────────────────────────────────────
 
 const workoutPlanSlice = createSlice({
   name: "workoutPlan",
   initialState,
   reducers: {
-    resetWorkoutPlanState: (state) => {
-      state.homePlan = null;
-      state.gymPlan = null;
-      state.days = [];
-      state.loading = false;
-      state.error = null;
-    },
+    resetWorkoutPlanState: () => initialState,
   },
   extraReducers: (builder) => {
+    // fetchActivePlans
     builder.addCase(fetchActivePlans.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -218,6 +183,7 @@ const workoutPlanSlice = createSlice({
         "Failed to fetch active workout plans.";
     });
 
+    // fetchTodayWorkout
     builder.addCase(fetchTodayWorkout.pending, (state) => {
       state.loading = true;
       state.error = null;

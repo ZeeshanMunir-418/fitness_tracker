@@ -10,9 +10,8 @@ import {
   saveOnboardingProfile,
 } from "@/store/slices/onboardingSlice";
 import { useRouter } from "expo-router";
-import { Loader2 } from "lucide-react-native";
-import React, { useEffect, useMemo, useRef } from "react";
-import { Animated, Image, Text, View } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Image, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -58,8 +57,6 @@ const SOFT_DEPTH_SHADOW = {
   shadowRadius: 18,
   elevation: 14,
 } as const;
-
-// ── animated progress bar ─────────────────────────────────────────────────────
 
 function ProgressBar({
   percent,
@@ -126,12 +123,10 @@ function SpinningLoader({ color }: { color: string }) {
 
   return (
     <Animated.View style={{ transform: [{ rotate }] }}>
-      <Loader2 size={18} color={color} />
+      <ActivityIndicator size="small" color={color} />
     </Animated.View>
   );
 }
-
-// ── main screen ───────────────────────────────────────────────────────────────
 
 const StepEightScreen = () => {
   const router = useRouter();
@@ -142,6 +137,7 @@ const StepEightScreen = () => {
     data,
     loading,
     error,
+    onboardingComplete,
     progressStep,
     planGenerationLoading,
     planGenerationProgress,
@@ -150,6 +146,7 @@ const StepEightScreen = () => {
   } = useAppSelector((s) => s.onboarding);
   const hasStartedPlanGenerationRef = useRef(false);
   const hasNavigatedRef = useRef(false);
+  const [hideProgressDock, setHideProgressDock] = useState(false);
 
   const { bmi, bmr, calories } = useMemo(() => {
     const weightKg = data.currentWeight
@@ -203,6 +200,25 @@ const StepEightScreen = () => {
     data.gender,
     data.activityLevel,
   ]);
+
+  useEffect(() => {
+    const isCompleted =
+      onboardingComplete &&
+      progressStep === 4 &&
+      !loading &&
+      !planGenerationLoading;
+
+    if (!isCompleted) {
+      setHideProgressDock(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setHideProgressDock(true);
+    }, 2500);
+
+    return () => clearTimeout(timeoutId);
+  }, [onboardingComplete, loading, planGenerationLoading, progressStep]);
 
   useEffect(() => {
     if (progressStep !== 4 || loading || hasStartedPlanGenerationRef.current) {
@@ -283,7 +299,8 @@ const StepEightScreen = () => {
   const profilePercent = profileStage?.percent ?? 0;
   const aiPercent = planGenerationProgress;
   const showProgressDock =
-    loading || progressStep > 0 || planGenerationLoading || aiPercent > 0;
+    !hideProgressDock &&
+    (loading || progressStep > 0 || planGenerationLoading || aiPercent > 0);
 
   const headline =
     planGenerationLoading || aiPercent > 0
@@ -484,7 +501,7 @@ const StepEightScreen = () => {
               style={{ color: colors.text }}
               className="font-dmsans-bold text-sm"
             >
-              AI Plan Generation
+              Workout Plan Generation
             </Text>
             <View className="flex-row items-center gap-2">
               {planGenerationLoading ? (

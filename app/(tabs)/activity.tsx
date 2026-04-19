@@ -1,41 +1,53 @@
-import {
-    readStepsFromStorage,
-    readStepsHistory,
-    type StepsHistory,
-} from "@/lib/stepCounter";
+import { useWater } from "@/lib/hooks/useWater";
+import { readStepsFromStorage } from "@/lib/stepCounter";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useThemeStyles } from "@/lib/theme/useThemeStyles";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { fetchTodayMeals } from "@/store/slices/dailyMealSlice";
+import {
+  DailyMeal,
+  fetchMealsForDate,
+  fetchTodayMeals,
+} from "@/store/slices/dailyMealSlice";
 import { fetchProfile } from "@/store/slices/profileSlice";
 import { fetchWorkoutLogs } from "@/store/slices/workoutLogSlice";
 import {
-    Activity,
-    Apple,
-    Clock,
-    Coffee,
-    Dumbbell,
-    Flame,
-    GlassWater,
-    Moon,
-    Sun,
-    TrendingUp,
+  Activity,
+  Apple,
+  Clock,
+  Coffee,
+  Dumbbell,
+  GlassWater,
+  Moon,
+  Sun,
+  Utensils,
 } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable as RNPressable,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Pressable as RNPressable,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-type StepPeriod = "daily" | "weekly" | "monthly";
+type MealPeriod = "daily" | "weekly" | "monthly";
+
+interface NutritionBarChartProps {
+  meals: DailyMeal[];
+  calorieGoal: number;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snacks"] as const;
+
+const MEAL_LABELS: Record<(typeof MEAL_TYPES)[number], string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snacks: "Snacks",
+};
 
 const MEAL_ICONS: Record<
   string,
@@ -56,6 +68,8 @@ const formatDate = (iso: string) =>
     day: "numeric",
     year: "numeric",
   });
+
+const toIso = (d: Date) => d.toISOString().split("T")[0];
 
 // ── Bar Chart ──────────────────────────────────────────────────────────────────
 interface BarChartProps {
@@ -93,7 +107,6 @@ const BarChart = ({ data, maxValue, highlightIndex }: BarChartProps) => {
               marginHorizontal: 2,
             }}
           >
-            {/* Value label above bar */}
             {item.value > 0 ? (
               <Text
                 style={{
@@ -110,8 +123,6 @@ const BarChart = ({ data, maxValue, highlightIndex }: BarChartProps) => {
             ) : (
               <View style={{ height: 16 }} />
             )}
-
-            {/* Rounded bar */}
             <View
               style={{
                 width: "100%",
@@ -120,8 +131,6 @@ const BarChart = ({ data, maxValue, highlightIndex }: BarChartProps) => {
                 backgroundColor: isHighlight ? colors.text : colors.borderMuted,
               }}
             />
-
-            {/* X-axis label */}
             <Text
               style={{
                 color: isHighlight ? colors.text : colors.textFaint,
@@ -139,50 +148,109 @@ const BarChart = ({ data, maxValue, highlightIndex }: BarChartProps) => {
   );
 };
 
-// ── Steps Section ──────────────────────────────────────────────────────────────
-const StepsSection = ({ todaySteps }: { todaySteps: number }) => {
+// ── Nutrition Bar Chart ────────────────────────────────────────────────────────
+const NutritionBarChart = ({ meals, calorieGoal }: NutritionBarChartProps) => {
   const { colors } = useTheme();
   const styles = useThemeStyles();
-  const [period, setPeriod] = useState<StepPeriod>("weekly");
-  const [history, setHistory] = useState<StepsHistory>({});
+  const dispatch = useAppDispatch();
 
+  const [period, setPeriod] = useState<MealPeriod>("daily");
+
+  // Cache of { [isoDate]: totalCalories } for historical dates
+  const [historicalCalories, setHistoricalCalories] = useState<
+    Record<string, number>
+  >({});
+  const [histLoading, setHistLoading] = useState(false);
+
+  const todayIso = toIso(new Date());
+  const todayCalories = useMemo(
+    () => meals.reduce((sum, m) => sum + Number(m.total_calories ?? 0), 0),
+    [meals],
+  );
+
+  const PERIODS: { label: string; value: MealPeriod }[] = [
+    { label: "Daily", value: "daily" },
+    { label: "Weekly", value: "weekly" },
+    { label: "Monthly", value: "monthly" },
+  ];
+
+  // Returns all ISO dates needed for the current period (excluding today)
+  const getRequiredDates = useCallback((): string[] => {
+    const today = new Date();
+    const dates: string[] = [];
+
+    if (period === "weekly") {
+      const dayIdx = today.getDay();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - (dayIdx - i));
+        const iso = toIso(d);
+        if (iso !== todayIso && d <= today) dates.push(iso);
+      }
+    } else if (period === "monthly") {
+      for (let week = 0; week < 4; week++) {
+        for (let day = 0; day < 7; day++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - (3 - week) * 7 - today.getDay() + day);
+          const iso = toIso(d);
+          if (iso !== todayIso && d <= today) dates.push(iso);
+        }
+      }
+    }
+
+    return [...new Set(dates)];
+  }, [period, todayIso]);
+
+  // Fetch missing historical dates when period changes
   useEffect(() => {
-    readStepsHistory().then(setHistory);
-  }, []);
+    if (period === "daily") return;
 
+    const missing = getRequiredDates().filter(
+      (iso) => historicalCalories[iso] === undefined,
+    );
+    if (!missing.length) return;
+
+    setHistLoading(true);
+    Promise.all(
+      missing.map(async (iso) => {
+        const result = await dispatch(fetchMealsForDate(iso)).unwrap();
+        const total = result.meals.reduce(
+          (sum, m) => sum + Number(m.total_calories ?? 0),
+          0,
+        );
+        return { iso, total };
+      }),
+    )
+      .then((entries) => {
+        setHistoricalCalories((prev) => {
+          const next = { ...prev };
+          entries.forEach(({ iso, total }) => {
+            next[iso] = total;
+          });
+          return next;
+        });
+      })
+      .catch(console.error)
+      .finally(() => setHistLoading(false));
+  }, [period]);
+
+  // Merged calories map including today
+  const allCalories = useMemo(
+    () => ({ ...historicalCalories, [todayIso]: todayCalories }),
+    [historicalCalories, todayIso, todayCalories],
+  );
+
+  // ── Chart data per period ──────────────────────────────────────────────────
   const chartData = useMemo(() => {
     const today = new Date();
-    const todayIso = today.toISOString().split("T")[0];
 
     if (period === "daily") {
-      const currentHour = today.getHours();
-      const hours = [0, 3, 6, 9, 12, 15, 18, 21];
-      return hours.map((h) => {
-        const isPast = h <= currentHour;
-        const isCurrentBucket =
-          h ===
-          hours[
-            hours.reduce(
-              (closest, hh, i) =>
-                Math.abs(hh - currentHour) <
-                Math.abs(hours[closest] - currentHour)
-                  ? i
-                  : closest,
-              0,
-            )
-          ];
-        const label =
-          h === 0 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`;
-        const fraction = isPast
-          ? Math.min(1, h / Math.max(currentHour || 1, 1))
-          : 0;
-        const value = isCurrentBucket
-          ? todaySteps
-          : isPast
-            ? Math.round(todaySteps * fraction * 0.85)
-            : 0;
-        return { label, value };
-      });
+      const mealMap = new Map<string, number>();
+      meals.forEach((m) => mealMap.set(m.meal_type, m.total_calories));
+      return MEAL_TYPES.map((type) => ({
+        label: MEAL_LABELS[type].slice(0, 5),
+        value: mealMap.get(type) ?? 0,
+      }));
     }
 
     if (period === "weekly") {
@@ -191,17 +259,15 @@ const StepsSection = ({ todaySteps }: { todaySteps: number }) => {
       return Array.from({ length: 7 }, (_, i) => {
         const d = new Date(today);
         d.setDate(today.getDate() - (todayDayIdx - i));
-        const iso = d.toISOString().split("T")[0];
-        const isToday = iso === todayIso;
-        const isFuture = i > todayDayIdx;
+        const iso = toIso(d);
         return {
           label: dayNames[i],
-          value: isFuture ? 0 : isToday ? todaySteps : (history[iso] ?? 0),
+          value: i > todayDayIdx ? 0 : (allCalories[iso] ?? 0),
         };
       });
     }
 
-    // Monthly — last 4 weeks summed
+    // monthly — last 4 weeks summed into W1–W4
     return Array.from({ length: 4 }, (_, weekIndex) => {
       const weekStart = new Date(today);
       weekStart.setDate(today.getDate() - (3 - weekIndex) * 7 - today.getDay());
@@ -209,44 +275,53 @@ const StepsSection = ({ todaySteps }: { todaySteps: number }) => {
       for (let d = 0; d < 7; d++) {
         const day = new Date(weekStart);
         day.setDate(weekStart.getDate() + d);
-        const iso = day.toISOString().split("T")[0];
-        total += iso === todayIso ? todaySteps : (history[iso] ?? 0);
+        if (day > today) continue;
+        total += allCalories[toIso(day)] ?? 0;
       }
       return { label: `W${weekIndex + 1}`, value: total };
     });
-  }, [period, todaySteps, history]);
+  }, [period, meals, allCalories]);
 
-  const maxValue = Math.max(...chartData.map((d) => d.value), 1000);
-
+  // ── Highlight index ────────────────────────────────────────────────────────
   const highlightIndex = useMemo(() => {
     if (period === "daily") {
-      const currentHour = new Date().getHours();
-      const hours = [0, 3, 6, 9, 12, 15, 18, 21];
-      return hours.reduce(
-        (closest, h, i) =>
-          Math.abs(h - currentHour) < Math.abs(hours[closest] - currentHour)
-            ? i
-            : closest,
-        0,
-      );
+      const max = Math.max(...chartData.map((d) => d.value));
+      return max > 0 ? chartData.findIndex((d) => d.value === max) : undefined;
     }
     if (period === "weekly") return new Date().getDay();
-    return 3;
-  }, [period]);
+    return 3; // current (last) week column
+  }, [period, chartData]);
 
-  const PERIODS: { label: string; value: StepPeriod }[] = [
-    { label: "Daily", value: "daily" },
-    { label: "Weekly", value: "weekly" },
-    { label: "Monthly", value: "monthly" },
-  ];
-
-  const stepGoal = 10000;
-  const stepProgress = Math.min(1, todaySteps / stepGoal);
+  const maxValue = Math.max(...chartData.map((d) => d.value), 400);
   const isEmpty = chartData.every((d) => d.value === 0);
+
+  // Hero value and label
+  const heroValue = useMemo(() => {
+    if (period === "daily") return todayCalories;
+    if (period === "weekly") return chartData.reduce((s, d) => s + d.value, 0);
+    return chartData[3]?.value ?? 0;
+  }, [period, todayCalories, chartData]);
+
+  const heroLabel =
+    period === "daily"
+      ? "Today"
+      : period === "weekly"
+        ? "This week"
+        : "This week";
+
+  const calorieProgress =
+    calorieGoal > 0
+      ? Math.min(
+          1,
+          period === "daily"
+            ? todayCalories / calorieGoal
+            : heroValue / (calorieGoal * 7),
+        )
+      : 0;
 
   return (
     <View style={{ marginBottom: 24 }}>
-      {/* Section header */}
+      {/* Section header + period pills */}
       <View
         style={{
           flexDirection: "row",
@@ -256,9 +331,8 @@ const StepsSection = ({ todaySteps }: { todaySteps: number }) => {
         }}
       >
         <Text style={styles.text} className="font-dmsans-bold text-base">
-          Steps
+          Nutrition
         </Text>
-        {/* Period pills */}
         <View
           style={{
             flexDirection: "row",
@@ -310,58 +384,120 @@ const StepsSection = ({ todaySteps }: { todaySteps: number }) => {
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <TrendingUp size={16} color={colors.text} strokeWidth={1.5} />
+            <Utensils size={16} color={colors.text} strokeWidth={1.5} />
             <Text style={styles.text} className="font-dmsans-bold text-sm">
-              Today
+              {heroLabel}
             </Text>
           </View>
           <Text style={styles.text} className="font-dmsans-bold text-xl">
-            {todaySteps.toLocaleString()}
+            {heroValue.toLocaleString()}
             <Text style={styles.textMuted} className="font-dmsans text-xs">
-              {" "}
-              / {stepGoal.toLocaleString()} steps
+              {period === "daily"
+                ? ` / ${calorieGoal > 0 ? calorieGoal.toLocaleString() : "--"} kcal`
+                : " kcal"}
             </Text>
           </Text>
         </View>
 
-        {/* Progress bar */}
-        <View
-          style={{
-            height: 6,
-            borderRadius: 999,
-            overflow: "hidden",
-            backgroundColor: colors.cardBorder,
-            marginBottom: 20,
-          }}
-        >
+        {/* Progress bar — daily only */}
+        {period === "daily" && (
           <View
             style={{
-              width: `${Math.round(stepProgress * 100)}%`,
-              height: "100%",
-              backgroundColor: colors.text,
+              height: 6,
               borderRadius: 999,
+              overflow: "hidden",
+              backgroundColor: colors.cardBorder,
+              marginBottom: 20,
             }}
-          />
-        </View>
-
-        {/* Bar chart */}
-        <BarChart
-          data={chartData}
-          maxValue={maxValue}
-          highlightIndex={highlightIndex}
-        />
-
-        {/* Empty state */}
-        {isEmpty && (
-          <Text
-            style={[
-              styles.textFaint,
-              { textAlign: "center", fontSize: 12, marginTop: 8 },
-            ]}
-            className="font-dmsans"
           >
-            Start walking to see your step history
-          </Text>
+            <View
+              style={{
+                width: `${Math.round(calorieProgress * 100)}%`,
+                height: "100%",
+                backgroundColor: colors.text,
+                borderRadius: 999,
+              }}
+            />
+          </View>
+        )}
+
+        {/* Spacer when no progress bar */}
+        {period !== "daily" && <View style={{ height: 16 }} />}
+
+        {/* Chart or loading */}
+        {histLoading ? (
+          <View
+            style={{
+              height: 152,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <ActivityIndicator size="small" color={colors.textMuted} />
+          </View>
+        ) : (
+          <>
+            <BarChart
+              data={chartData}
+              maxValue={maxValue}
+              highlightIndex={highlightIndex}
+            />
+            {isEmpty && (
+              <Text
+                style={[
+                  styles.textFaint,
+                  { textAlign: "center", fontSize: 12, marginTop: 8 },
+                ]}
+                className="font-dmsans"
+              >
+                {period === "daily"
+                  ? "Log a meal to see your nutrition breakdown"
+                  : "No meals logged this period"}
+              </Text>
+            )}
+          </>
+        )}
+
+        {/* Meal icon legend — daily only */}
+        {period === "daily" && !isEmpty && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginTop: 16,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: colors.borderMuted,
+            }}
+          >
+            {MEAL_TYPES.map((type) => {
+              const MealIcon = MEAL_ICONS[type];
+              const cals =
+                chartData.find((d) => d.label === MEAL_LABELS[type].slice(0, 5))
+                  ?.value ?? 0;
+              return (
+                <View
+                  key={type}
+                  style={{ alignItems: "center", flex: 1, gap: 4 }}
+                >
+                  <MealIcon
+                    size={14}
+                    color={cals > 0 ? colors.text : colors.textFaint}
+                    strokeWidth={1.5}
+                  />
+                  <Text
+                    style={{
+                      color: cals > 0 ? colors.textMuted : colors.textFaint,
+                      fontSize: 9,
+                      fontFamily: "DMSans-Regular",
+                    }}
+                  >
+                    {cals > 0 ? `${cals} kcal` : "—"}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         )}
       </View>
     </View>
@@ -373,6 +509,7 @@ export default function ActivityScreen() {
   const dispatch = useAppDispatch();
   const { colors } = useTheme();
   const styles = useThemeStyles();
+  const { goalMl, totalMlToday } = useWater();
 
   const { data: profile, loading: profileLoading } = useAppSelector(
     (s) => s.profile,
@@ -418,8 +555,6 @@ export default function ActivityScreen() {
   }, [logs]);
 
   const calorieGoal = profile?.daily_calorie_target ?? 0;
-  const calorieProgress =
-    calorieGoal > 0 ? Math.min(1, todayCalories / calorieGoal) : 0;
 
   const mealMap = useMemo(() => {
     const map = new Map<string, { calories: number; count: number }>();
@@ -518,66 +653,14 @@ export default function ActivityScreen() {
           </View>
         </View>
 
-        {/* ── Steps chart ──────────────────────────────────────────────────── */}
-        <StepsSection todaySteps={todaySteps} />
+        {/* ── Nutrition Bar Chart ───────────────────────────────────────────── */}
+        <NutritionBarChart meals={meals} calorieGoal={calorieGoal} />
 
         {/* ── Today's Nutrition ────────────────────────────────────────────── */}
         <View style={{ marginBottom: 24 }}>
           <Text style={styles.text} className="font-dmsans-bold text-base mb-3">
             Today&apos;s Nutrition
           </Text>
-
-          {/* Calorie progress */}
-          <View
-            style={[
-              styles.card,
-              { borderWidth: 2, borderRadius: 14, padding: 14 },
-            ]}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 10,
-              }}
-            >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <Flame size={16} color={colors.text} strokeWidth={1.5} />
-                <Text style={styles.text} className="font-dmsans-bold text-sm">
-                  Calories
-                </Text>
-              </View>
-              <Text style={styles.textMuted} className="font-dmsans text-xs">
-                {todayCalories} / {calorieGoal || "--"}
-              </Text>
-            </View>
-            <View
-              style={{
-                height: 12,
-                borderRadius: 999,
-                overflow: "hidden",
-                backgroundColor: colors.cardBorder,
-              }}
-            >
-              <View
-                style={{
-                  width: `${Math.round(calorieProgress * 100)}%`,
-                  height: "100%",
-                  backgroundColor: colors.text,
-                  borderRadius: 999,
-                }}
-              />
-            </View>
-            <Text
-              style={[styles.textMuted, { marginTop: 6 }]}
-              className="font-dmsans text-xs"
-            >
-              {Math.round(calorieProgress * 100)}% of target
-            </Text>
-          </View>
 
           {/* Water goal */}
           <View
@@ -587,7 +670,6 @@ export default function ActivityScreen() {
                 borderWidth: 2,
                 borderRadius: 14,
                 padding: 14,
-                marginTop: 8,
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -608,7 +690,7 @@ export default function ActivityScreen() {
               </View>
             </View>
             <Text style={styles.text} className="font-dmsans-bold text-xl">
-              {profile?.daily_water_goal_liters ?? "--"}L
+              {(totalMlToday / 1000).toFixed(2)}L/{(goalMl / 1000).toFixed(1)}L
             </Text>
           </View>
 

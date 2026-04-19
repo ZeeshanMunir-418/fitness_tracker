@@ -33,21 +33,24 @@ function WorkoutDayCard({
   const { colors } = useTheme();
   const styles = useThemeStyles();
 
+  const gifUrl: string | null =
+    Array.isArray(day.exercises) && day.exercises.length > 0
+      ? (day.exercises[0]?.gifUrl ?? null)
+      : null;
+
+  const cardStyle = {
+    borderWidth: 2,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderColor: isToday ? colors.border : colors.borderMuted,
+    backgroundColor: isToday ? colors.card : "transparent",
+  } as const;
+
   if (day.is_rest_day) {
     return (
-      <View
-        style={[
-          styles.card,
-          {
-            borderWidth: 2,
-            borderRadius: 16,
-            padding: 14,
-            marginBottom: 10,
-            borderColor: isToday ? colors.border : colors.borderMuted,
-          },
-        ]}
-      >
-        {isToday ? (
+      <View style={[styles.card, cardStyle]}>
+        {isToday && (
           <View
             style={{
               borderWidth: 2,
@@ -63,7 +66,7 @@ function WorkoutDayCard({
               Today
             </Text>
           </View>
-        ) : null}
+        )}
         <View className="flex-row items-center justify-between">
           <View>
             <Text
@@ -76,7 +79,7 @@ function WorkoutDayCard({
               style={styles.text}
               className="font-dmsans-bold text-base mt-1"
             >
-              Rest Day
+              Rest & Recovery
             </Text>
           </View>
           <Moon size={22} color={colors.textMuted} strokeWidth={1.5} />
@@ -86,19 +89,8 @@ function WorkoutDayCard({
   }
 
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          borderWidth: 2,
-          borderRadius: 16,
-          padding: 14,
-          marginBottom: 10,
-          borderColor: isToday ? colors.border : colors.borderMuted,
-        },
-      ]}
-    >
-      {isToday ? (
+    <View style={[styles.card, cardStyle]}>
+      {isToday && (
         <View
           style={{
             borderWidth: 2,
@@ -107,23 +99,39 @@ function WorkoutDayCard({
             paddingHorizontal: 10,
             paddingVertical: 4,
             alignSelf: "flex-start",
-            marginBottom: 8,
+            marginBottom: 10,
           }}
         >
           <Text style={styles.text} className="font-dmsans-bold text-xs">
             Today
           </Text>
         </View>
-      ) : null}
+      )}
 
-      <Image
-        source={fallbackImage(day.day_number)}
-        className="w-full h-40 rounded-xl"
-        resizeMode="contain"
-      />
+      {gifUrl ? (
+        <Image
+          source={fallbackImage(day.day_number)}
+          style={{ width: "100%", height: 160, borderRadius: 12 }}
+          resizeMode="contain"
+        />
+      ) : (
+        <View
+          style={{
+            width: "100%",
+            height: 100,
+            borderRadius: 12,
+            backgroundColor: colors.borderMuted,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Dumbbell size={28} color={colors.textMuted} strokeWidth={1.5} />
+        </View>
+      )}
+
       <Text
         style={styles.textMuted}
-        className="font-dmsans text-xs uppercase tracking-widest mt-2"
+        className="font-dmsans text-xs uppercase tracking-widest mt-3"
       >
         {day.day_name}
       </Text>
@@ -136,7 +144,7 @@ function WorkoutDayCard({
         </Text>
       ) : null}
       <Text style={styles.textMuted} className="font-dmsans text-xs mt-2">
-        {day.exercises_count} exercises · {day.duration_minutes} mins
+        {day.exercises_count} exercises · {day.duration_minutes} min
       </Text>
 
       <Link
@@ -172,13 +180,10 @@ export default function WorkoutsTabScreen() {
     }
   }, [dispatch, homePlan, gymPlan]);
 
+  // Auto-select whichever plan exists if only one is available
   useEffect(() => {
-    if (!homePlan && gymPlan) {
-      setPlanType("gym");
-    }
-    if (homePlan && !gymPlan) {
-      setPlanType("home");
-    }
+    if (!homePlan && gymPlan) setPlanType("gym");
+    if (homePlan && !gymPlan) setPlanType("home");
   }, [homePlan, gymPlan]);
 
   const todayNumber = getTodayDayNumber();
@@ -189,7 +194,6 @@ export default function WorkoutsTabScreen() {
       planType === "home"
         ? (homePlan?.workout_plan_days ?? [])
         : (gymPlan?.workout_plan_days ?? []);
-
     return [...days].sort((a, b) => a.day_number - b.day_number);
   }, [planType, homePlan, gymPlan]);
 
@@ -211,38 +215,28 @@ export default function WorkoutsTabScreen() {
           </Text>
         </View>
 
-        {hasBothPlans ? (
+        {/* Plan type toggle — only shown when both plans exist */}
+        {hasBothPlans && (
           <View className="flex-row gap-2 mb-4">
-            <Button
-              className="flex-1"
-              variant={planType === "home" ? "primary" : "outline"}
-              onPress={() => setPlanType("home")}
-            >
-              <Text
-                style={{
-                  color: planType === "home" ? colors.background : colors.text,
-                }}
-                className="font-dmsans-bold text-sm"
+            {(["home", "gym"] as PlanType[]).map((type) => (
+              <Button
+                key={type}
+                className="flex-1"
+                variant={planType === type ? "primary" : "outline"}
+                onPress={() => setPlanType(type)}
               >
-                Home
-              </Text>
-            </Button>
-            <Button
-              className="flex-1"
-              variant={planType === "gym" ? "primary" : "outline"}
-              onPress={() => setPlanType("gym")}
-            >
-              <Text
-                style={{
-                  color: planType === "gym" ? colors.background : colors.text,
-                }}
-                className="font-dmsans-bold text-sm"
-              >
-                Gym
-              </Text>
-            </Button>
+                <Text
+                  style={{
+                    color: planType === type ? colors.background : colors.text,
+                  }}
+                  className="font-dmsans-bold text-sm capitalize"
+                >
+                  {type}
+                </Text>
+              </Button>
+            ))}
           </View>
-        ) : null}
+        )}
 
         {loading ? (
           <View className="items-center justify-center py-16">

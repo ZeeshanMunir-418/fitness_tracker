@@ -72,6 +72,7 @@ interface OnboardingState {
   planGenerationMessage: string;
   planGenerationError: string | null;
   data: OnboardingData;
+  onboardingComplete: boolean;
 }
 
 const initialState: OnboardingState = {
@@ -107,6 +108,7 @@ const initialState: OnboardingState = {
     preferredWorkoutTime: null,
     mealReminders: true,
   },
+  onboardingComplete: false,
 };
 
 export const saveOnboardingProfile = createAsyncThunk<
@@ -289,6 +291,11 @@ export const generateWorkoutPlan = createAsyncThunk<
         },
       );
 
+      console.log("[onboarding] workout plan generation response", {
+        data,
+        error,
+      });
+
       if (error) {
         try {
           const body = await (error as any).context?.json?.();
@@ -365,6 +372,9 @@ const onboardingSlice = createSlice({
       state.planGenerationMessage = "";
       state.planGenerationError = null;
     },
+    setOnboardingComplete: (state, action: PayloadAction<boolean>) => {
+      state.onboardingComplete = action.payload;
+    },
     resetOnboarding: () => initialState,
   },
   extraReducers: (builder) => {
@@ -377,6 +387,7 @@ const onboardingSlice = createSlice({
     builder.addCase(saveOnboardingProfile.fulfilled, (state) => {
       state.loading = false;
       state.error = null;
+      state.onboardingComplete = true;
       // progressStep stays at 4 so the UI can react and navigate
     });
     builder.addCase(saveOnboardingProfile.rejected, (state, action) => {
@@ -417,6 +428,7 @@ export const {
   setProgressStep,
   setPlanGenerationProgress,
   resetPlanGenerationState,
+  setOnboardingComplete,
   resetOnboarding,
 } = onboardingSlice.actions;
 export default onboardingSlice.reducer;

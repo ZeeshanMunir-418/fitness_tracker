@@ -5,7 +5,7 @@ import type { RootState } from "../index";
 export interface FoodItem {
   id: string;
   daily_meal_id: string;
-  food_id: string;
+  food_id: string | null; // nullable in schema
   food_name: string;
   serving_size: string;
   calories: number;
@@ -29,199 +29,67 @@ const initialState: FoodItemState = {
 
 type ThunkConfig = { state: RootState; rejectValue: string };
 
-/**
- * Fetches all food items linked to a specific daily meal.
- */
 export const fetchFoodItemsForMeal = createAsyncThunk<
   FoodItem[],
-  string,
+  string, // daily_meal_id
   ThunkConfig
 >(
   "foodItem/fetchFoodItemsForMeal",
   async (dailyMealId, { getState, rejectWithValue }) => {
-    console.log("[foodItem] fetchFoodItemsForMeal start", { dailyMealId });
+    const userId = getState().auth.user?.id;
+    if (!userId) return rejectWithValue("User is not authenticated.");
 
-    try {
-      const userId = getState().auth.user?.id;
+    const { data, error } = await supabase
+      .from("food_items")
+      .select("*")
+      .eq("daily_meal_id", dailyMealId)
+      .order("created_at", { ascending: true });
 
-      if (!userId) {
-        throw new Error("User is not authenticated.");
-      }
-
-      const { data: mealData, error: mealError } = await supabase
-        .from("daily_meals")
-        .select("id")
-        .eq("id", dailyMealId)
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (mealError) {
-        console.error(
-          "[foodItem] fetchFoodItemsForMeal failed while validating meal",
-          mealError,
-        );
-        return rejectWithValue(mealError.message);
-      }
-
-      if (!mealData) {
-        console.log("[foodItem] fetchFoodItemsForMeal end", { itemsCount: 0 });
-        return [];
-      }
-
-      const { data, error } = await supabase
-        .from("food_items")
-        .select("*")
-        .eq("daily_meal_id", dailyMealId)
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        console.error("[foodItem] fetchFoodItemsForMeal failed", error);
-        return rejectWithValue(error.message);
-      }
-
-      const items = (data ?? []) as FoodItem[];
-      console.log("[foodItem] fetchFoodItemsForMeal end", {
-        itemsCount: items.length,
-      });
-      return items;
-    } catch (error) {
+    if (error) {
       console.error("[foodItem] fetchFoodItemsForMeal failed", error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch food items for meal.";
-      return rejectWithValue(message);
+      return rejectWithValue(error.message);
     }
+
+    return (data ?? []) as FoodItem[];
   },
 );
 
-/**
- * Adds a food item to a daily meal.
- */
 export const addFoodItem = createAsyncThunk<
   FoodItem,
   Omit<FoodItem, "id" | "created_at">,
   ThunkConfig
 >("foodItem/addFoodItem", async (payload, { getState, rejectWithValue }) => {
-  console.log("[foodItem] addFoodItem start", {
-    dailyMealId: payload.daily_meal_id,
-  });
+  const userId = getState().auth.user?.id;
+  if (!userId) return rejectWithValue("User is not authenticated.");
 
-  try {
-    const userId = getState().auth.user?.id;
+  const { data, error } = await supabase
+    .from("food_items")
+    .insert(payload)
+    .select("*")
+    .single();
 
-    if (!userId) {
-      throw new Error("User is not authenticated.");
-    }
-
-    const { data: mealData, error: mealError } = await supabase
-      .from("daily_meals")
-      .select("id")
-      .eq("id", payload.daily_meal_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (mealError) {
-      console.error(
-        "[foodItem] addFoodItem failed while validating meal",
-        mealError,
-      );
-      return rejectWithValue(mealError.message);
-    }
-
-    if (!mealData) {
-      return rejectWithValue("Meal not found for current user.");
-    }
-
-    const { data, error } = await supabase
-      .from("food_items")
-      .insert(payload)
-      .select("*")
-      .single();
-
-    if (error) {
-      console.error("[foodItem] addFoodItem failed", error);
-      return rejectWithValue(error.message);
-    }
-
-    const item = data as FoodItem;
-    console.log("[foodItem] addFoodItem end", { id: item.id });
-    return item;
-  } catch (error) {
+  if (error) {
     console.error("[foodItem] addFoodItem failed", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to add food item.";
-    return rejectWithValue(message);
+    return rejectWithValue(error.message);
   }
+
+  return data as FoodItem;
 });
 
-/**
- * Deletes a food item by id.
- */
 export const deleteFoodItem = createAsyncThunk<string, string, ThunkConfig>(
   "foodItem/deleteFoodItem",
   async (id, { getState, rejectWithValue }) => {
-    console.log("[foodItem] deleteFoodItem start", { id });
+    const userId = getState().auth.user?.id;
+    if (!userId) return rejectWithValue("User is not authenticated.");
 
-    try {
-      const userId = getState().auth.user?.id;
+    const { error } = await supabase.from("food_items").delete().eq("id", id);
 
-      if (!userId) {
-        throw new Error("User is not authenticated.");
-      }
-
-      const { data: itemData, error: itemError } = await supabase
-        .from("food_items")
-        .select("id, daily_meal_id")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (itemError) {
-        console.error(
-          "[foodItem] deleteFoodItem failed while validating item",
-          itemError,
-        );
-        return rejectWithValue(itemError.message);
-      }
-
-      if (!itemData) {
-        return id;
-      }
-
-      const { data: mealData, error: mealError } = await supabase
-        .from("daily_meals")
-        .select("id")
-        .eq("id", itemData.daily_meal_id)
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (mealError) {
-        console.error(
-          "[foodItem] deleteFoodItem failed while validating meal",
-          mealError,
-        );
-        return rejectWithValue(mealError.message);
-      }
-
-      if (!mealData) {
-        return rejectWithValue("Food item does not belong to current user.");
-      }
-
-      const { error } = await supabase.from("food_items").delete().eq("id", id);
-
-      if (error) {
-        console.error("[foodItem] deleteFoodItem failed", error);
-        return rejectWithValue(error.message);
-      }
-
-      console.log("[foodItem] deleteFoodItem end", { id });
-      return id;
-    } catch (error) {
+    if (error) {
       console.error("[foodItem] deleteFoodItem failed", error);
-      const message =
-        error instanceof Error ? error.message : "Failed to delete food item.";
-      return rejectWithValue(message);
+      return rejectWithValue(error.message);
     }
+
+    return id;
   },
 );
 
@@ -229,13 +97,10 @@ const foodItemSlice = createSlice({
   name: "foodItem",
   initialState,
   reducers: {
-    resetFoodItemState: (state) => {
-      state.items = [];
-      state.loading = false;
-      state.error = null;
-    },
+    resetFoodItemState: () => initialState,
   },
   extraReducers: (builder) => {
+    // fetchFoodItemsForMeal
     builder.addCase(fetchFoodItemsForMeal.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -250,6 +115,7 @@ const foodItemSlice = createSlice({
         action.payload ?? action.error.message ?? "Failed to fetch food items.";
     });
 
+    // addFoodItem
     builder.addCase(addFoodItem.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -264,6 +130,7 @@ const foodItemSlice = createSlice({
         action.payload ?? action.error.message ?? "Failed to add food item.";
     });
 
+    // deleteFoodItem
     builder.addCase(deleteFoodItem.pending, (state) => {
       state.loading = true;
       state.error = null;

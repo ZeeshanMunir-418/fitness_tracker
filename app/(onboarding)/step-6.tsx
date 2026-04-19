@@ -5,18 +5,18 @@ import Input from "@/components/ui/input";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-    nextStep,
-    prevStep,
-    updateOnboardingData,
+  nextStep,
+  prevStep,
+  updateOnboardingData,
 } from "@/store/slices/onboardingSlice";
 import { Href, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    Text,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Text,
+  View,
 } from "react-native";
 
 const weeklyOptions = [
@@ -133,7 +133,6 @@ const StepSixScreen = () => {
             />
           </View>
 
-          {/* ── Weekly Weight Change ──────────────────────────────────── */}
           <View className="gap-2">
             <Text
               style={{ color: colors.textMuted }}

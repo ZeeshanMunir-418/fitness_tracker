@@ -2,8 +2,8 @@ import { useTheme } from "@/lib/theme/ThemeContext";
 import { useThemeStyles } from "@/lib/theme/useThemeStyles";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import type {
-    PlanType,
-    WorkoutExercise,
+  PlanType,
+  WorkoutExercise,
 } from "@/store/slices/workoutPlanSlice";
 import { fetchActivePlans } from "@/store/slices/workoutPlanSlice";
 import { workouts } from "@/utils/workouts";
@@ -11,12 +11,12 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, Clock, Dumbbell, Moon } from "lucide-react-native";
 import React, { useEffect, useMemo } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    Pressable,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -25,13 +25,12 @@ const fallbackImage = (dayNumber: number) => {
   return fallback?.image ?? workouts[0].image;
 };
 
-const exerciseSlug = (name: string) => name.toLowerCase().replace(/\s+/g, "-");
-
 export default function WorkoutDetailScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { colors } = useTheme();
   const styles = useThemeStyles();
+
   const { id, planType } = useLocalSearchParams<{
     id: string;
     planType?: string;
@@ -65,7 +64,10 @@ export default function WorkoutDetailScreen() {
     ? day.exercises
     : [];
 
-  const totalSets = exercises.reduce((sum, item) => sum + item.sets, 0);
+  const totalSets = exercises.reduce((sum, e) => sum + (e.sets ?? 0), 0);
+
+  // Hero GIF: use first exercise's gifUrl
+  const heroGifUrl: string | null = exercises[0]?.gifUrl ?? null;
 
   if (loading && !day) {
     return (
@@ -80,6 +82,7 @@ export default function WorkoutDetailScreen() {
   if (!day) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <Stack.Screen options={{ headerShown: false }} />
         <View className="flex-1 items-center justify-center px-6">
           <Text style={styles.text} className="font-dmsans-bold text-lg">
             Workout not found
@@ -97,6 +100,7 @@ export default function WorkoutDetailScreen() {
   if (day.is_rest_day) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <Stack.Screen options={{ headerShown: false }} />
         <View style={{ padding: 16 }}>
           <Pressable onPress={() => router.back()}>
             <ArrowLeft size={24} color={colors.text} strokeWidth={1.5} />
@@ -108,13 +112,14 @@ export default function WorkoutDetailScreen() {
             style={[styles.text, { marginTop: 10 }]}
             className="font-dmsans-bold text-lg"
           >
-            Rest Day
+            Rest & Recovery
           </Text>
           <Text
             style={[styles.textMuted, { marginTop: 6 }]}
-            className="font-dmsans text-sm"
+            className="font-dmsans text-sm text-center"
           >
-            Recovery day for {day.day_name}
+            {day.day_name} is your recovery day. Light stretching or a walk is
+            encouraged.
           </Text>
         </View>
       </SafeAreaView>
@@ -129,16 +134,41 @@ export default function WorkoutDetailScreen() {
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
         >
-          <View className="relative">
-            <Image
-              source={fallbackImage(day.day_number)}
-              className="w-full h-56"
-              resizeMode="contain"
-            />
+          {/* Hero — real GIF or placeholder */}
+          <View style={{ position: "relative" }}>
+            {heroGifUrl ? (
+              <Image
+                source={fallbackImage(day.day_number)}
+                style={{ width: "100%", height: 220 }}
+                resizeMode="contain"
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: 220,
+                  backgroundColor: colors.borderMuted,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Dumbbell
+                  size={40}
+                  color={colors.textMuted}
+                  strokeWidth={1.5}
+                />
+              </View>
+            )}
             <Pressable
               onPress={() => router.back()}
-              className="absolute top-4 left-4 p-2 rounded-full"
-              style={{ backgroundColor: colors.card }}
+              style={{
+                position: "absolute",
+                top: 16,
+                left: 16,
+                padding: 8,
+                borderRadius: 999,
+                backgroundColor: colors.card,
+              }}
             >
               <ArrowLeft size={20} color={colors.text} strokeWidth={1.5} />
             </Pressable>
@@ -166,60 +196,47 @@ export default function WorkoutDetailScreen() {
               </Text>
             ) : null}
 
+            {/* Stats row */}
             <View className="flex-row gap-2 mt-4">
-              <View
-                style={[
-                  styles.card,
-                  { borderWidth: 2, borderRadius: 12, padding: 12, flex: 1 },
-                ]}
-              >
-                <Dumbbell size={16} color={colors.text} strokeWidth={1.5} />
-                <Text
-                  style={[styles.text, { marginTop: 6 }]}
-                  className="font-dmsans-bold text-base"
+              {[
+                {
+                  icon: (
+                    <Dumbbell size={16} color={colors.text} strokeWidth={1.5} />
+                  ),
+                  value: day.exercises_count,
+                  label: "Exercises",
+                },
+                {
+                  icon: (
+                    <Clock size={16} color={colors.text} strokeWidth={1.5} />
+                  ),
+                  value: day.duration_minutes,
+                  label: "Minutes",
+                },
+                { icon: null, value: totalSets, label: "Total sets" },
+              ].map(({ icon, value, label }) => (
+                <View
+                  key={label}
+                  style={[
+                    styles.card,
+                    { borderWidth: 2, borderRadius: 12, padding: 12, flex: 1 },
+                  ]}
                 >
-                  {day.exercises_count}
-                </Text>
-                <Text style={styles.textMuted} className="font-dmsans text-xs">
-                  Exercises
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.card,
-                  { borderWidth: 2, borderRadius: 12, padding: 12, flex: 1 },
-                ]}
-              >
-                <Clock size={16} color={colors.text} strokeWidth={1.5} />
-                <Text
-                  style={[styles.text, { marginTop: 6 }]}
-                  className="font-dmsans-bold text-base"
-                >
-                  {day.duration_minutes}
-                </Text>
-                <Text style={styles.textMuted} className="font-dmsans text-xs">
-                  Minutes
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.card,
-                  { borderWidth: 2, borderRadius: 12, padding: 12, flex: 1 },
-                ]}
-              >
-                <Text
-                  style={styles.text}
-                  className="font-dmsans-bold text-base"
-                >
-                  {totalSets}
-                </Text>
-                <Text
-                  style={styles.textMuted}
-                  className="font-dmsans text-xs mt-1"
-                >
-                  Total sets
-                </Text>
-              </View>
+                  {icon}
+                  <Text
+                    style={[styles.text, { marginTop: icon ? 6 : 0 }]}
+                    className="font-dmsans-bold text-base"
+                  >
+                    {value}
+                  </Text>
+                  <Text
+                    style={styles.textMuted}
+                    className="font-dmsans text-xs"
+                  >
+                    {label}
+                  </Text>
+                </View>
+              ))}
             </View>
 
             <View
@@ -229,6 +246,7 @@ export default function WorkoutDetailScreen() {
               ]}
             />
 
+            {/* Exercise list */}
             {exercises.length === 0 ? (
               <View className="items-center py-8">
                 <Text style={styles.textMuted} className="font-dmsans text-sm">
@@ -238,7 +256,7 @@ export default function WorkoutDetailScreen() {
             ) : (
               exercises.map((exercise, index) => (
                 <View
-                  key={`${exercise.name}-${index}`}
+                  key={exercise.exerciseDbId ?? `${exercise.name}-${index}`}
                   style={[
                     styles.card,
                     {
@@ -249,11 +267,25 @@ export default function WorkoutDetailScreen() {
                     },
                   ]}
                 >
+                  {/* Exercise GIF thumbnail */}
+                  <View className="flex flex-row items-center justify-center">
+                    {exercise.gifUrl ? (
+                      <Image
+                        source={{ uri: exercise.gifUrl }}
+                        style={{
+                          width: 200,
+                          height: 200,
+                        }}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+                  </View>
+
                   <View className="flex-row items-center justify-between">
                     <View className="flex-1 mr-2">
                       <Text
                         style={styles.text}
-                        className="font-dmsans-bold text-base"
+                        className="font-dmsans-bold text-base capitalize"
                       >
                         {exercise.name}
                       </Text>
@@ -283,88 +315,53 @@ export default function WorkoutDetailScreen() {
                   </View>
 
                   <View className="flex-row gap-2 mt-3">
-                    <View
-                      style={[
-                        styles.input,
-                        {
-                          borderWidth: 2,
-                          borderRadius: 10,
-                          padding: 8,
-                          flex: 1,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={styles.textMuted}
-                        className="font-dmsans text-xs"
+                    {[
+                      { label: "Reps", value: exercise.reps },
+                      { label: "Rest", value: `${exercise.restSeconds}s` },
+                      { label: "Sets", value: exercise.sets },
+                    ].map(({ label, value }) => (
+                      <View
+                        key={label}
+                        style={[
+                          styles.input,
+                          {
+                            borderWidth: 2,
+                            borderRadius: 10,
+                            padding: 8,
+                            flex: 1,
+                          },
+                        ]}
                       >
-                        Reps
-                      </Text>
-                      <Text
-                        style={styles.text}
-                        className="font-dmsans-bold text-sm mt-1"
-                      >
-                        {exercise.reps}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.input,
-                        {
-                          borderWidth: 2,
-                          borderRadius: 10,
-                          padding: 8,
-                          flex: 1,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={styles.textMuted}
-                        className="font-dmsans text-xs"
-                      >
-                        Rest
-                      </Text>
-                      <Text
-                        style={styles.text}
-                        className="font-dmsans-bold text-sm mt-1"
-                      >
-                        {exercise.restSeconds}s
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.input,
-                        {
-                          borderWidth: 2,
-                          borderRadius: 10,
-                          padding: 8,
-                          flex: 1,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={styles.textMuted}
-                        className="font-dmsans text-xs"
-                      >
-                        Sets
-                      </Text>
-                      <Text
-                        style={styles.text}
-                        className="font-dmsans-bold text-sm mt-1"
-                      >
-                        {exercise.sets}
-                      </Text>
-                    </View>
+                        <Text
+                          style={styles.textMuted}
+                          className="font-dmsans text-xs"
+                        >
+                          {label}
+                        </Text>
+                        <Text
+                          style={styles.text}
+                          className="font-dmsans-bold text-sm mt-1"
+                        >
+                          {value}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
 
-                  {exercise.instructions ? (
-                    <Text
-                      style={[styles.textMuted, { marginTop: 8 }]}
-                      className="font-dmsans text-xs leading-5"
-                    >
-                      {exercise.instructions}
-                    </Text>
-                  ) : null}
+                  {exercise.instructions
+                    ? exercise.instructions
+                        .split(". ")
+                        .map((instruction, index) => (
+                          <Text
+                            key={index}
+                            style={styles.textMuted}
+                            className="font-dmsans text-xs leading-5 mb-px"
+                            numberOfLines={4}
+                          >
+                            {instruction}
+                          </Text>
+                        ))
+                    : null}
 
                   <Pressable
                     onPress={() =>
@@ -372,7 +369,9 @@ export default function WorkoutDetailScreen() {
                         pathname: "/workouts/exercises/[slug]",
                         params: {
                           id,
-                          slug: exerciseSlug(exercise.name),
+                          slug:
+                            exercise.exerciseDbId ??
+                            exercise.name.toLowerCase().replace(/\s+/g, "-"),
                           exercise: JSON.stringify(exercise),
                           planType: resolvedPlanType,
                         },

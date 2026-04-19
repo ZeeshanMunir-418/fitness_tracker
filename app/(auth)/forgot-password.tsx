@@ -3,10 +3,11 @@ import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
-import { ArrowLeft, CheckCircle, Mail, Loader2 } from "lucide-react-native";
+import { ArrowLeft, CheckCircle, Mail } from "lucide-react-native";
 import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -261,7 +262,7 @@ const ForgotPasswordScreen = () => {
                 }}
               >
                 {loading ? (
-                  <Loader2 color={colors.background} className='animate-spin'/>
+                  <ActivityIndicator color={colors.background} />
                 ) : (
                   <Text
                     style={{ color: colors.background }}
