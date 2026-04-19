@@ -4,10 +4,12 @@ import {
   type KeyMetrics,
 } from "@/components/(tabs)/home/metric-card";
 import { Progress } from "@/components/(tabs)/home/progress";
+import { WaterTracker } from "@/components/(tabs)/home/water-tracker";
 import WorkoutCard from "@/components/(tabs)/home/workout-card";
 import { Button } from "@/components/ui/button";
 import { useGreeting } from "@/lib/hooks/useGreeting";
 import { usePedometer } from "@/lib/hooks/usePedometer";
+import { useWater } from "@/lib/hooks/useWater";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchTodayMeals } from "@/store/slices/dailyMealSlice";
@@ -71,6 +73,7 @@ const HomeScreen = () => {
 
   const calorieGoal = profile?.daily_calorie_target ?? 2000;
   const waterGoalLiters = profile?.daily_water_goal_liters ?? 2;
+  const { todayLogs } = useWater();
 
   const todayActiveMinutes = useMemo(() => {
     const todayIso = new Date().toISOString().split("T")[0];
@@ -102,6 +105,10 @@ const HomeScreen = () => {
     });
     return { protein, carbs, fat };
   }, [meals]);
+
+  const waterIntake = useMemo(() => {
+    return todayLogs.reduce((sum, log) => sum + log.amount_ml, 0);
+  }, [todayLogs]);
 
   const macroGoals = useMemo(
     () => ({
@@ -138,7 +145,7 @@ const HomeScreen = () => {
     },
     {
       icon: Droplets,
-      value: `${waterGoalLiters}L`,
+      value: `${(waterIntake / 1000).toFixed(2)}L/${waterGoalLiters.toFixed(1)}L`,
       label: "WATER",
     },
     {
@@ -339,6 +346,10 @@ const HomeScreen = () => {
               />
             </View>
           ))}
+        </View>
+
+        <View className="px-6">
+          <WaterTracker />
         </View>
 
         {/* Divider */}

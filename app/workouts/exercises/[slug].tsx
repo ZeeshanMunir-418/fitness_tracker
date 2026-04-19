@@ -6,11 +6,18 @@ import type { WorkoutExercise } from "@/store/slices/workoutPlanSlice";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, CheckCircle2, RotateCcw, Timer } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, Vibration, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  Vibration,
+  View,
+} from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -295,7 +302,7 @@ export default function ExerciseDetailScreen() {
         </Pressable>
         <Text
           style={[styles.text, { fontSize: 22 }]}
-          className="font-dmsans-bold"
+          className="font-dmsans-bold capitalize"
           numberOfLines={1}
         >
           {exercise.name}
@@ -309,7 +316,12 @@ export default function ExerciseDetailScreen() {
         <View
           style={[
             styles.card,
-            { borderWidth: 2, borderRadius: 16, padding: 16, marginBottom: 12 },
+            {
+              borderWidth: 2,
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 12,
+            },
           ]}
         >
           <Text
@@ -320,16 +332,28 @@ export default function ExerciseDetailScreen() {
           </Text>
           <Text
             style={[styles.text, { marginTop: 4 }]}
-            className="font-dmsans-bold text-lg"
+            className="font-dmsans-bold text-lg capitalize"
           >
             {exercise.name}
           </Text>
-          <Text
-            style={[styles.textMuted, { marginTop: 8 }]}
-            className="font-dmsans text-sm"
-          >
-            {exercise.instructions}
-          </Text>
+          {exercise.instructions
+            ? exercise.instructions.split(". ").map((line, index) => (
+                <Text
+                  key={index}
+                  style={[styles.textMuted, { marginTop: 6 }]}
+                  className="font-dmsans text-sm"
+                >
+                  {line}
+                </Text>
+              ))
+            : null}
+          <View>
+            <Image
+              source={{ uri: exercise.gifUrl }}
+              style={{ width: "100%", height: 200, marginTop: 12 }}
+              resizeMode="contain"
+            />
+          </View>
         </View>
 
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>

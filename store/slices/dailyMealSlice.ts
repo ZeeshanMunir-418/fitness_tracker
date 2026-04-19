@@ -7,7 +7,7 @@ export type MealType = "breakfast" | "lunch" | "dinner" | "snacks";
 export interface FoodItem {
   id: string;
   daily_meal_id: string;
-  food_id: string;
+  food_id: string | null; // nullable in schema
   food_name: string;
   serving_size: string;
   calories: number;
@@ -54,93 +54,57 @@ const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
 const calculateCalories = (meals: DailyMeal[]) =>
   meals.reduce((total, meal) => total + Number(meal.total_calories ?? 0), 0);
 
-/**
- * Fetches today's daily meals and nested food items for the current user.
- */
 export const fetchTodayMeals = createAsyncThunk<
   { meals: DailyMeal[]; todayCalories: number },
   void,
   ThunkConfig
 >("dailyMeal/fetchTodayMeals", async (_, { getState, rejectWithValue }) => {
-  try {
-    const userId = getState().auth.user?.id;
-    const today = getTodayIsoDate();
+  const userId = getState().auth.user?.id;
+  if (!userId) return rejectWithValue("User is not authenticated.");
 
-    if (!userId) {
-      throw new Error("User is not authenticated.");
-    }
+  const { data, error } = await supabase
+    .from("daily_meals")
+    .select("*, food_items(*)")
+    .eq("user_id", userId)
+    .eq("meal_date", getTodayIsoDate())
+    .order("meal_type", { ascending: true });
+
+  if (error) {
+    console.error("[dailyMeal] fetchTodayMeals failed", error);
+    return rejectWithValue(error.message);
+  }
+
+  const meals = (data ?? []) as DailyMeal[];
+  return { meals, todayCalories: calculateCalories(meals) };
+});
+
+export const fetchMealsForDate = createAsyncThunk<
+  { meals: DailyMeal[]; todayCalories: number },
+  string, // YYYY-MM-DD
+  ThunkConfig
+>(
+  "dailyMeal/fetchMealsForDate",
+  async (date, { getState, rejectWithValue }) => {
+    const userId = getState().auth.user?.id;
+    if (!userId) return rejectWithValue("User is not authenticated.");
 
     const { data, error } = await supabase
       .from("daily_meals")
       .select("*, food_items(*)")
       .eq("user_id", userId)
-      .eq("meal_date", today)
+      .eq("meal_date", date)
       .order("meal_type", { ascending: true });
 
     if (error) {
-      console.error("[dailyMeal] fetchTodayMeals failed", error);
+      console.error("[dailyMeal] fetchMealsForDate failed", error);
       return rejectWithValue(error.message);
     }
 
     const meals = (data ?? []) as DailyMeal[];
-    const todayCalories = calculateCalories(meals);
-
-    return { meals, todayCalories };
-  } catch (error) {
-    console.error("[dailyMeal] fetchTodayMeals failed", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch today's meals.";
-    return rejectWithValue(message);
-  }
-});
-
-/**
- * Fetches daily meals and nested food items for a provided YYYY-MM-DD date.
- */
-export const fetchMealsForDate = createAsyncThunk<
-  { meals: DailyMeal[]; todayCalories: number },
-  string,
-  ThunkConfig
->(
-  "dailyMeal/fetchMealsForDate",
-  async (date, { getState, rejectWithValue }) => {
-    try {
-      const userId = getState().auth.user?.id;
-
-      if (!userId) {
-        throw new Error("User is not authenticated.");
-      }
-
-      const { data, error } = await supabase
-        .from("daily_meals")
-        .select("*, food_items(*)")
-        .eq("user_id", userId)
-        .eq("meal_date", date)
-        .order("meal_type", { ascending: true });
-
-      if (error) {
-        console.error("[dailyMeal] fetchMealsForDate failed", error);
-        return rejectWithValue(error.message);
-      }
-
-      const meals = (data ?? []) as DailyMeal[];
-      const todayCalories = calculateCalories(meals);
-
-      return { meals, todayCalories };
-    } catch (error) {
-      console.error("[dailyMeal] fetchMealsForDate failed", error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch meals for date.";
-      return rejectWithValue(message);
-    }
+    return { meals, todayCalories: calculateCalories(meals) };
   },
 );
 
-/**
- * Creates or updates today's meal row for the current user by meal type.
- */
 export const upsertDailyMeal = createAsyncThunk<
   DailyMeal,
   UpsertDailyMealInput,
@@ -148,76 +112,50 @@ export const upsertDailyMeal = createAsyncThunk<
 >(
   "dailyMeal/upsertDailyMeal",
   async (payload, { getState, rejectWithValue }) => {
-    try {
-      const userId = getState().auth.user?.id;
-      const today = getTodayIsoDate();
+    const userId = getState().auth.user?.id;
+    if (!userId) return rejectWithValue("User is not authenticated.");
 
-      if (!userId) {
-        throw new Error("User is not authenticated.");
-      }
+    const { data, error } = await supabase
+      .from("daily_meals")
+      .upsert(
+        {
+          user_id: userId,
+          meal_date: getTodayIsoDate(),
+          meal_type: payload.meal_type,
+          total_calories: payload.total_calories,
+        },
+        { onConflict: "user_id,meal_date,meal_type" },
+      )
+      .select("*, food_items(*)")
+      .single();
 
-      const { data, error } = await supabase
-        .from("daily_meals")
-        .upsert(
-          {
-            user_id: userId,
-            meal_date: today,
-            meal_type: payload.meal_type,
-            total_calories: payload.total_calories,
-          },
-          {
-            onConflict: "user_id,meal_date,meal_type",
-          },
-        )
-        .select("*, food_items(*)")
-        .single();
-
-      if (error) {
-        console.error("[dailyMeal] upsertDailyMeal failed", error);
-        return rejectWithValue(error.message);
-      }
-
-      const meal = data as DailyMeal;
-      return meal;
-    } catch (error) {
+    if (error) {
       console.error("[dailyMeal] upsertDailyMeal failed", error);
-      const message =
-        error instanceof Error ? error.message : "Failed to upsert daily meal.";
-      return rejectWithValue(message);
+      return rejectWithValue(error.message);
     }
+
+    return data as DailyMeal;
   },
 );
 
-/**
- * Deletes a daily meal row for the current user.
- */
 export const deleteDailyMeal = createAsyncThunk<string, string, ThunkConfig>(
   "dailyMeal/deleteDailyMeal",
   async (id, { getState, rejectWithValue }) => {
-    try {
-      const userId = getState().auth.user?.id;
+    const userId = getState().auth.user?.id;
+    if (!userId) return rejectWithValue("User is not authenticated.");
 
-      if (!userId) {
-        throw new Error("User is not authenticated.");
-      }
+    const { error } = await supabase
+      .from("daily_meals")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
 
-      const { error } = await supabase
-        .from("daily_meals")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", userId);
-
-      if (error) {
-        console.error("[dailyMeal] deleteDailyMeal failed", error);
-        return rejectWithValue(error.message);
-      }
-      return id;
-    } catch (error) {
+    if (error) {
       console.error("[dailyMeal] deleteDailyMeal failed", error);
-      const message =
-        error instanceof Error ? error.message : "Failed to delete daily meal.";
-      return rejectWithValue(message);
+      return rejectWithValue(error.message);
     }
+
+    return id;
   },
 );
 
@@ -225,14 +163,10 @@ const dailyMealSlice = createSlice({
   name: "dailyMeal",
   initialState,
   reducers: {
-    resetDailyMealState: (state) => {
-      state.meals = [];
-      state.todayCalories = 0;
-      state.loading = false;
-      state.error = null;
-    },
+    resetDailyMealState: () => initialState,
   },
   extraReducers: (builder) => {
+    // fetchTodayMeals
     builder.addCase(fetchTodayMeals.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -250,6 +184,7 @@ const dailyMealSlice = createSlice({
         "Failed to fetch today's meals.";
     });
 
+    // fetchMealsForDate
     builder.addCase(fetchMealsForDate.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -267,22 +202,19 @@ const dailyMealSlice = createSlice({
         "Failed to fetch meals for date.";
     });
 
+    // upsertDailyMeal
     builder.addCase(upsertDailyMeal.pending, (state) => {
       state.loading = true;
       state.error = null;
     });
     builder.addCase(upsertDailyMeal.fulfilled, (state, action) => {
       state.loading = false;
-      const index = state.meals.findIndex(
-        (meal) => meal.id === action.payload.id,
-      );
-
+      const index = state.meals.findIndex((m) => m.id === action.payload.id);
       if (index >= 0) {
         state.meals[index] = action.payload;
       } else {
         state.meals.push(action.payload);
       }
-
       state.todayCalories = calculateCalories(state.meals);
     });
     builder.addCase(upsertDailyMeal.rejected, (state, action) => {
@@ -293,13 +225,14 @@ const dailyMealSlice = createSlice({
         "Failed to upsert daily meal.";
     });
 
+    // deleteDailyMeal
     builder.addCase(deleteDailyMeal.pending, (state) => {
       state.loading = true;
       state.error = null;
     });
     builder.addCase(deleteDailyMeal.fulfilled, (state, action) => {
       state.loading = false;
-      state.meals = state.meals.filter((meal) => meal.id !== action.payload);
+      state.meals = state.meals.filter((m) => m.id !== action.payload);
       state.todayCalories = calculateCalories(state.meals);
     });
     builder.addCase(deleteDailyMeal.rejected, (state, action) => {

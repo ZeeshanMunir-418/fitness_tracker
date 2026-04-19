@@ -4,12 +4,13 @@ import dailyMealReducer from "./slices/dailyMealSlice";
 import foodItemReducer from "./slices/foodItemSlice";
 import mealPlanReducer from "./slices/mealPlanSlice";
 import notificationReducer, {
-    type NotificationState,
+  type NotificationState,
 } from "./slices/notificationSlice";
 import nutritionReducer from "./slices/nutritionSlice";
 import onboardingReducer from "./slices/onboardingSlice";
 import profileReducer from "./slices/profileSlice";
 import themeReducer from "./slices/themeSlice";
+import waterReducer from "./slices/waterSlice";
 import workoutLogReducer from "./slices/workoutLogSlice";
 import workoutPlanReducer from "./slices/workoutPlanSlice";
 
@@ -27,6 +28,7 @@ export const store = configureStore({
     nutrition: nutritionReducer,
     profile: profileReducer,
     theme: themeReducer,
+    water: waterReducer,
     workoutLog: workoutLogReducer,
     workoutPlan: workoutPlanReducer,
   },

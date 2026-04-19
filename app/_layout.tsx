@@ -2,6 +2,7 @@ import "@/lib/tasks/stepCounterTask";
 
 import InAppNotificationBanner from "@/components/InAppNotificationBanner";
 import { useNotifications } from "@/lib/hooks/useNotifications";
+import { usePushToken } from "@/lib/hooks/usePushToken";
 import { supabase } from "@/lib/supabase";
 import { registerStepCounterTask } from "@/lib/tasks/stepCounterTask";
 import { ThemeProvider, useTheme } from "@/lib/theme/ThemeContext";
@@ -13,14 +14,15 @@ import { DMSans_400Regular, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
-import { Stack, usePathname, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Loader2 } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 import "react-native-reanimated";
 import { Provider } from "react-redux";
 import "../globals.css";
+
+// ── Onboarding cache ───────────────────────────────────────────────────────────
 
 const onboardingCacheKey = (userId: string) =>
   `apex_onboarding_completed_${userId}`;
@@ -55,9 +57,10 @@ export const unstable_settings = {
   anchor: "(auth)",
 };
 
+// ── Auth link helpers ──────────────────────────────────────────────────────────
+
 const resolveAuthUrlFromIncoming = (incomingUrl: string): string | null => {
   let current = incomingUrl;
-
   for (let depth = 0; depth < 4; depth += 1) {
     if (
       current.includes("auth/callback") ||
@@ -65,22 +68,13 @@ const resolveAuthUrlFromIncoming = (incomingUrl: string): string | null => {
     ) {
       return current;
     }
-
     const parsed = Linking.parse(current);
     const nestedUrl = parsed.queryParams?.url;
-
-    if (typeof nestedUrl !== "string" || nestedUrl.length === 0) {
-      break;
-    }
-
+    if (typeof nestedUrl !== "string" || nestedUrl.length === 0) break;
     const decoded = decodeURIComponent(nestedUrl);
-    if (!decoded || decoded === current) {
-      break;
-    }
-
+    if (!decoded || decoded === current) break;
     current = decoded;
   }
-
   return null;
 };
 
@@ -110,17 +104,7 @@ const processAuthCallbackUrl = async (
   incomingUrl: string,
 ): Promise<void> => {
   const resolvedUrl = resolveAuthUrlFromIncoming(incomingUrl);
-
-  console.log("[auth-link] received", {
-    source,
-    incomingUrl,
-    resolvedUrl,
-  });
-
-  if (!resolvedUrl) {
-    console.log("[auth-link] ignored non-callback URL", { source });
-    return;
-  }
+  if (!resolvedUrl) return;
 
   const parsed = Linking.parse(resolvedUrl);
   const query = parsed.queryParams ?? {};
@@ -139,15 +123,11 @@ const processAuthCallbackUrl = async (
       access_token: accessToken,
       refresh_token: refreshToken,
     });
-
-    if (error) {
+    if (error)
       console.error("[auth-link] setSession failed", {
         source,
         message: error.message,
       });
-    } else {
-      console.log("[auth-link] setSession succeeded", { source });
-    }
     return;
   }
 
@@ -156,96 +136,47 @@ const processAuthCallbackUrl = async (
       token_hash: token,
       type: type as any,
     });
-
-    if (error) {
+    if (error)
       console.error("[auth-link] verifyOtp failed", {
         source,
         message: error.message,
       });
-    } else {
-      console.log("[auth-link] verifyOtp succeeded", { source });
-    }
     return;
   }
 
-  if (!code && !resolvedUrl.includes("auth/callback")) {
-    console.log("[auth-link] no auth payload found", {
-      source,
-      resolvedUrl,
-    });
-    return;
-  }
+  if (!code && !resolvedUrl.includes("auth/callback")) return;
 
   const { error } = await supabase.auth.exchangeCodeForSession(resolvedUrl);
-
-  if (error) {
+  if (error)
     console.error("[auth-link] exchange failed", {
       source,
       message: error.message,
     });
-  } else {
-    console.log("[auth-link] exchange succeeded", { source });
-  }
 };
+
+// ── Nav destination type ───────────────────────────────────────────────────────
+
+type NavDestination = "loading" | "login" | "onboarding" | "tabs";
+
+// ── AppNavigator ───────────────────────────────────────────────────────────────
 
 function AppNavigator() {
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const pathname = usePathname();
   const segments = useSegments();
   const { session: authSession, initialized } = useAppSelector((s) => s.auth);
   const { isDark, colors } = useTheme();
+
+  // Single source of truth for where we should be
+  const [destination, setDestination] = useState<NavDestination>("loading");
   const [isOfflineAlertVisible, setIsOfflineAlertVisible] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const rootSegment = segments[0] as string | undefined;
-  const inAuthGroup = rootSegment === "(auth)";
-  const inOnboardingGroup = rootSegment === "(onboarding)";
-  const inTabsGroup = rootSegment === "(tabs)";
-  const inWorkouts = rootSegment === "workouts";
-  const inScan = rootSegment === "scan";
-  const inProfile = rootSegment === "(profile)";
-  const inNotifications = rootSegment === "(notifications)";
-  const inAuthCallback = rootSegment === "auth";
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  // Prevent duplicate navigations
+  const lastNavigated = useRef<NavDestination | null>(null);
 
-  useEffect(() => {
-    const segmentText = segments.length ? segments.join("/") : "(root)";
-    console.log("[nav] render", {
-      pathname,
-      segment: segmentText,
-      rootSegment,
-      initialized,
-      hasSession: Boolean(authSession),
-      userId: authSession?.user?.id ?? null,
-    });
-  }, [pathname, segments, rootSegment, initialized, authSession]);
-
-  useEffect(() => {
-    Linking.getInitialURL()
-      .then((initialUrl) => {
-        console.log("[auth-link] initial URL", { url: initialUrl });
-        if (initialUrl) {
-          void processAuthCallbackUrl("initial", initialUrl);
-        }
-      })
-      .catch((error) => {
-        console.error("[auth-link] failed to read initial URL", {
-          message: String(error),
-        });
-      });
-
-    const sub = Linking.addEventListener("url", ({ url }) => {
-      void processAuthCallbackUrl("listener", url);
-    });
-
-    return () => sub.remove();
-  }, []);
+  // ── Internet check ─────────────────────────────────────────────────────────
 
   const checkInternetConnection = useCallback(async () => {
-    const timeoutMs = 5000;
     const healthUrls = [
       process.env.EXPO_PUBLIC_SUPABASE_URL,
       "https://clients3.google.com/generate_204",
@@ -255,7 +186,7 @@ function AppNavigator() {
 
     for (const url of healthUrls) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       try {
         const response = await fetch(url, {
           method: "GET",
@@ -268,11 +199,13 @@ function AppNavigator() {
         clearTimeout(timeoutId);
       }
     }
-
     return false;
   }, []);
 
   useNotifications();
+  usePushToken();
+
+  // ── Side effects ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     registerStepCounterTask();
@@ -280,12 +213,10 @@ function AppNavigator() {
 
   useEffect(() => {
     let isActive = true;
-
     const run = async () => {
       const isOnline = await checkInternetConnection();
       if (isActive) setIsOfflineAlertVisible(!isOnline);
     };
-
     run();
     const id = setInterval(run, 10000);
     return () => {
@@ -293,6 +224,19 @@ function AppNavigator() {
       clearInterval(id);
     };
   }, [checkInternetConnection]);
+
+  useEffect(() => {
+    Linking.getInitialURL()
+      .then((url) => {
+        if (url) void processAuthCallbackUrl("initial", url);
+      })
+      .catch((e) => console.error("[auth-link] initial URL error", String(e)));
+
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      void processAuthCallbackUrl("listener", url);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     dispatch(loadTheme());
@@ -308,111 +252,120 @@ function AppNavigator() {
         }),
       );
     });
-
     return () => subscription.unsubscribe();
   }, [dispatch]);
 
+  // ── Core routing logic — runs once initialized, resolves destination ────────
+
   useEffect(() => {
     if (!initialized) return;
-    if (!isMounted) return;
 
+    // No session → login
     if (!authSession) {
-      if (inAuthGroup || inAuthCallback) return;
-      if (rootSegment === undefined) return;
-
-      router.replace("/login");
+      setDestination("login");
       return;
     }
 
-    let isEffectActive = true;
+    let isActive = true;
+    const userId = authSession.user.id;
 
-    const checkOnboarding = async () => {
-      const cached = await getCachedOnboardingCompleted(authSession.user.id);
+    const resolve = async () => {
+      // ── Optimistic: trust cache immediately ──────────────────────────────
+      const cached = await getCachedOnboardingCompleted(userId);
 
-      const routeFromCached = async () => {
-        if (cached === false) {
-          if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
-          return;
-        }
+      if (!isActive) return;
 
-        if (cached === true) {
-          if (inOnboardingGroup || inAuthGroup) router.replace("/(tabs)");
-          return;
-        }
+      if (cached === true) {
+        // Optimistically go to tabs — verify in background
+        setDestination("tabs");
+      } else if (cached === false) {
+        setDestination("onboarding");
+      }
+      // cached === null → stay on "loading" until DB responds
 
-        if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
-      };
-
-      if (!isEffectActive) return;
-
+      // ── Verify against DB ────────────────────────────────────────────────
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("onboarding_completed")
-        .eq("id", authSession.user.id)
+        .eq("id", userId)
         .single();
 
-      if (!isEffectActive) return;
+      if (!isActive) return;
 
       if (error) {
-        const errorCode = String((error as any)?.code ?? "");
-        const errorMessage = String(
-          (error as any)?.message ?? "",
-        ).toLowerCase();
-        const errorDetails = String(
-          (error as any)?.details ?? "",
-        ).toLowerCase();
+        const code = String((error as any)?.code ?? "");
+        const msg = String((error as any)?.message ?? "").toLowerCase();
+        const det = String((error as any)?.details ?? "").toLowerCase();
 
-        // When the profile row is deleted/missing, force onboarding instead of trusting stale cache.
-        const isMissingProfileRow =
-          errorCode === "PGRST116" ||
-          errorMessage.includes("no rows") ||
-          errorDetails.includes("0 rows");
+        const isMissingRow =
+          code === "PGRST116" ||
+          msg.includes("no rows") ||
+          det.includes("0 rows");
 
-        if (isMissingProfileRow) {
-          await setCachedOnboardingCompleted(authSession.user.id, false);
-          if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
+        if (isMissingRow) {
+          await setCachedOnboardingCompleted(userId, false);
+          setDestination("onboarding");
           return;
         }
 
-        await routeFromCached();
+        // DB unreachable — fall back to cache, default to onboarding if no cache
+        setDestination(cached === true ? "tabs" : "onboarding");
         return;
       }
 
-      if (!profile?.onboarding_completed) {
-        await setCachedOnboardingCompleted(authSession.user.id, false);
-        if (!inOnboardingGroup) router.replace("/(onboarding)/step-1");
-        return;
-      }
-
-      await setCachedOnboardingCompleted(authSession.user.id, true);
-
-      // Only redirect to tabs from auth/onboarding entry points.
-      // Do not hijack valid protected routes like /scan or /workouts.
-      if (inOnboardingGroup || inAuthGroup) {
-        router.replace("/(tabs)");
-      }
+      const completed = Boolean(profile?.onboarding_completed);
+      await setCachedOnboardingCompleted(userId, completed);
+      setDestination(completed ? "tabs" : "onboarding");
     };
 
-    checkOnboarding();
-
+    resolve();
     return () => {
-      isEffectActive = false;
+      isActive = false;
     };
-  }, [
-    initialized,
-    isMounted,
-    authSession,
-    router,
-    rootSegment,
-    inAuthGroup,
-    inOnboardingGroup,
-    inAuthCallback,
-  ]);
+  }, [initialized, authSession]);
 
-  if (!initialized && !inAuthCallback) {
+  // ── Navigate when destination changes ─────────────────────────────────────
+
+  useEffect(() => {
+    if (destination === "loading") return;
+    if (lastNavigated.current === destination) return;
+
+    const rootSegment = segments[0] as string | undefined;
+    const inAuthCallback = rootSegment === "auth";
+
+    // Never interrupt an in-flight OAuth callback
+    if (inAuthCallback) return;
+
+    lastNavigated.current = destination;
+
+    switch (destination) {
+      case "login":
+        router.replace("/login");
+        break;
+      case "onboarding":
+        router.replace("/(onboarding)/step-1");
+        break;
+      case "tabs":
+        router.replace("/(tabs)");
+        break;
+    }
+  }, [destination, segments, router]);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  // Block render entirely until we know where to go
+  // (spinner only shows when there's no cache hit — typically first install)
+  if (destination === "loading") {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <Loader2 size={24} color={colors.text} className="animate-spin" />
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={colors.text} />
       </View>
     );
   }
@@ -507,9 +460,10 @@ function AppNavigator() {
   );
 }
 
+// ── Wrappers ───────────────────────────────────────────────────────────────────
+
 function ThemedAppNavigator() {
   const { colors } = useTheme();
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <AppNavigator />

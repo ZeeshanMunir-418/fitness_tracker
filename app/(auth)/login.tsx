@@ -37,6 +37,7 @@ const LoginScreen = () => {
     googleLoading,
     error: authError,
   } = useAppSelector((s) => s.auth);
+  const {} = useAppSelector((s) => s.onboarding);
   const [showPassword, setShowPassword] = useState(false);
 
   const {
@@ -57,7 +58,6 @@ const LoginScreen = () => {
       signIn({ email: data.email, password: data.password }),
     );
     if (signIn.fulfilled.match(result)) {
-      router.replace("/(tabs)");
     }
   };
 

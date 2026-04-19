@@ -265,6 +265,12 @@ export const setupNotificationListeners = (router: Router): (() => void) => {
       return;
     }
 
+    const getScreenFromData = (rawData: unknown): string | null => {
+      if (!rawData || typeof rawData !== "object") return null;
+      const value = (rawData as Record<string, unknown>).screen;
+      return typeof value === "string" && value.length > 0 ? value : null;
+    };
+
     receivedSubscription = notifications.addNotificationReceivedListener(
       (notification: unknown) => {
         const maybeNotification = notification as {
@@ -286,6 +292,11 @@ export const setupNotificationListeners = (router: Router): (() => void) => {
             : undefined;
 
         store.dispatch(enqueueInAppNotification({ title, body, data }));
+
+        const screenValue = getScreenFromData(rawData);
+        if (screenValue) {
+          router.push(screenValue as never);
+        }
       },
     );
 
@@ -303,16 +314,22 @@ export const setupNotificationListeners = (router: Router): (() => void) => {
           };
 
           const maybeData = maybeResponse.notification?.request?.content?.data;
-          const screenValue =
-            typeof maybeData === "object" && maybeData !== null
-              ? (maybeData as Record<string, unknown>).screen
-              : undefined;
-
-          if (typeof screenValue === "string" && screenValue.length > 0) {
+          const screenValue = getScreenFromData(maybeData);
+          if (screenValue) {
             router.push(screenValue as never);
           }
         },
       );
+
+    if (typeof notifications.getLastNotificationResponseAsync === "function") {
+      const lastResponse =
+        await notifications.getLastNotificationResponseAsync();
+      const maybeData = lastResponse?.notification?.request?.content?.data;
+      const screenValue = getScreenFromData(maybeData);
+      if (screenValue) {
+        router.push(screenValue as never);
+      }
+    }
   })();
 
   return () => {

@@ -1,6 +1,7 @@
 {
   "expo": {
-    "name": "Apex Fitness Coach",
+    "name": "Apex Fitness: Workout & Health Tracker",
+    "slug": "apex-fitness-coach",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -11,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.zaindotdev.apexfitnesscoach",
       "infoPlist": {
-        "NSMotionUsageDescription": "Allow Apex Fitness Coach to track your steps.",
+        "NSMotionUsageDescription": "Allow Apex Fitness: Workout & Health Tracker to track your steps.",
         "UIBackgroundModes": ["fetch", "remote-notification"],
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -75,7 +76,7 @@
       [
         "expo-sensors",
         {
-          "motionPermission": "Allow Apex Fitness Coach to track your steps."
+          "motionPermission": "Allow Apex Fitness: Workout & Health Tracker to track your steps."
         }
       ],
       [

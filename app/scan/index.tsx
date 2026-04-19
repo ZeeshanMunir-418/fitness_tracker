@@ -5,27 +5,27 @@ import { CameraView, useCameraPermissions, type CameraType } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { router, Stack } from "expo-router";
 import {
-    AlertCircle,
-    ArrowLeft,
-    CheckCircle2,
-    FlipHorizontal2,
-    Loader2,
-    Utensils,
-    X,
-    Zap,
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  FlipHorizontal2,
+  Utensils,
+  X,
+  Zap,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    Easing,
-    Modal,
-    Pressable,
-    ScrollView,
-    StatusBar,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Easing,
+  Modal,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -205,6 +205,17 @@ export default function ScanScreen() {
 
   const meta = MEAL_META[mealType];
 
+  const normalizeScanError = useCallback((message: string) => {
+    if (
+      /llm returned non[- ]json response|doesn'?t contain a meal|does not contain a meal/i.test(
+        message,
+      )
+    ) {
+      return "The image doesn't contain a meal.";
+    }
+    return message;
+  }, []);
+
   // Scan line loop
   const startScan = useCallback(() => {
     scanY.setValue(0);
@@ -377,11 +388,20 @@ export default function ScanScreen() {
       }
 
       if (!res.ok || !data || data.error) {
-        throw new Error(
+        const backendError =
           data?.error ??
-            data?.validation_errors?.join(", ") ??
-            (raw ? raw.trim() : null) ??
-            `Analysis failed (${res.status})`,
+          data?.validation_errors?.join(", ") ??
+          (raw ? raw.trim() : null) ??
+          `Analysis failed (${res.status})`;
+
+        const backendContext = [data?.extracted, data?.raw, raw]
+          .filter(
+            (v): v is string => typeof v === "string" && v.trim().length > 0,
+          )
+          .join(" ");
+
+        throw new Error(
+          normalizeScanError(`${backendError} ${backendContext}`.trim()),
         );
       }
 
@@ -392,7 +412,7 @@ export default function ScanScreen() {
       stopScan();
       setDetected(false);
       const msg = err instanceof Error ? err.message : "Something went wrong.";
-      setError(msg);
+      setError(normalizeScanError(msg));
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setScanning(false);
@@ -424,7 +444,7 @@ export default function ScanScreen() {
           justifyContent: "center",
         }}
       >
-        <Loader2 color="rgba(255,255,255,0.4)" className="animate-spin" />
+        <ActivityIndicator color="rgba(255,255,255,0.4)" size={"large"} />
       </View>
     );
   }
@@ -591,7 +611,6 @@ export default function ScanScreen() {
           {scanning && (
             <Animated.View
               style={{
-                position: "absolute",
                 left: 0,
                 right: 0,
                 height: 1.5,
@@ -870,11 +889,7 @@ export default function ScanScreen() {
                   }}
                 >
                   {scanning ? (
-                    <Loader2
-                      color={meta.color}
-                      size="small"
-                      className="animate-spin"
-                    />
+                    <ActivityIndicator color={meta.color} size="large" />
                   ) : (
                     <Zap size={22} color="#000" fill="#000" strokeWidth={1.5} />
                   )}
